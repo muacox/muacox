@@ -238,46 +238,71 @@ const Admin = () => {
     }
   };
 
-  const processTransaction = async (transactionId: string, newStatus: 'approved' | 'rejected', transaction: Transaction) => {
-    const { error } = await supabase
-      .from('transactions')
-      .update({ status: newStatus })
-      .eq('id', transactionId);
+  const processTransaction = async (transactionId: string, action: 'approved' | 'rejected', transaction: Transaction) => {
+    // Map action to proper status
+    const newStatus = action === 'approved' ? 'completed' : 'failed';
+    
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .update({ status: newStatus })
+        .eq('id', transactionId);
 
-    if (error) {
-      toast.error("Erro ao processar transação");
-      return;
-    }
-
-    // If approving a deposit, add to user balance
-    if (newStatus === 'approved' && transaction.type === 'deposit') {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('balance')
-        .eq('user_id', transaction.user_id)
-        .single();
-
-      if (profile) {
-        await supabase
-          .from('profiles')
-          .update({ balance: (profile.balance || 0) + transaction.amount })
-          .eq('user_id', transaction.user_id);
+      if (error) {
+        toast.error("Erro ao processar transação");
+        console.error("Transaction update error:", error);
+        return;
       }
+
+      // If approving a deposit, add to user balance
+      if (action === 'approved' && transaction.type === 'deposit') {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('balance')
+          .eq('user_id', transaction.user_id)
+          .single();
+
+        if (profile) {
+          await supabase
+            .from('profiles')
+            .update({ balance: (profile.balance || 0) + transaction.amount })
+            .eq('user_id', transaction.user_id);
+        }
+      }
+
+      // If rejecting a withdrawal, refund the balance
+      if (action === 'rejected' && transaction.type === 'withdrawal') {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('balance')
+          .eq('user_id', transaction.user_id)
+          .single();
+
+        if (profile) {
+          await supabase
+            .from('profiles')
+            .update({ balance: (profile.balance || 0) + transaction.amount })
+            .eq('user_id', transaction.user_id);
+        }
+      }
+
+      // Send notification
+      await supabase.from('notifications').insert({
+        user_id: transaction.user_id,
+        type: transaction.type,
+        title: `${transaction.type === 'deposit' ? 'Depósito' : 'Levantamento'} ${action === 'approved' ? 'Aprovado' : 'Rejeitado'}`,
+        message: action === 'approved' 
+          ? `Sua transação de ${transaction.amount.toLocaleString('pt-AO')} AOA foi aprovada!`
+          : `Sua transação de ${transaction.amount.toLocaleString('pt-AO')} AOA foi rejeitada.`
+      });
+
+      toast.success(`Transação ${action === 'approved' ? 'aprovada' : 'rejeitada'} com sucesso!`);
+      fetchTransactions();
+      fetchUsers();
+    } catch (err) {
+      console.error("Error processing transaction:", err);
+      toast.error("Erro ao processar transação");
     }
-
-    // Send notification
-    await supabase.from('notifications').insert({
-      user_id: transaction.user_id,
-      type: transaction.type,
-      title: `${transaction.type === 'deposit' ? 'Depósito' : 'Saque'} ${newStatus === 'approved' ? 'Aprovado' : 'Rejeitado'}`,
-      message: newStatus === 'approved' 
-        ? `Sua transação de ${transaction.amount.toLocaleString('pt-AO')} AOA foi aprovada.`
-        : `Sua transação de ${transaction.amount.toLocaleString('pt-AO')} AOA foi rejeitada.`
-    });
-
-    toast.success(`Transação ${newStatus === 'approved' ? 'aprovada' : 'rejeitada'}`);
-    fetchTransactions();
-    fetchUsers();
   };
 
   const updatePdfStatus = async (productId: string, status: 'approved' | 'rejected', product: PdfProduct) => {
@@ -659,12 +684,12 @@ const Admin = () => {
 
                     <div className="flex items-center justify-between">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        t.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
-                        t.status === 'rejected' ? 'bg-red-500/20 text-red-400' :
+                        t.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
+                        t.status === 'failed' ? 'bg-red-500/20 text-red-400' :
                         'bg-amber-500/20 text-amber-400'
                       }`}>
-                        {t.status === 'approved' ? 'Aprovado' :
-                         t.status === 'rejected' ? 'Rejeitado' :
+                        {t.status === 'completed' ? 'Aprovado' :
+                         t.status === 'failed' ? 'Rejeitado' :
                          'Pendente'}
                       </span>
 
