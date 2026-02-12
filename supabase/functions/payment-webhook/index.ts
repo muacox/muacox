@@ -9,7 +9,7 @@ const corsHeaders = {
 };
 
 const supabaseUrl = Deno.env.get("https://owtcqvefxjncwunhkxdc.supabase.co")!;
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabaseServiceKey = Deno.env.get("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93dGNxdmVmeGpuY3d1bmhreGRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NzU3MjMsImV4cCI6MjA4NTQ1MTcyM30.EoFxpzS5Phv0tE98kXjGy3FUXEwlXTqsaq-QxzCWjF0")!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // PlinqPay API configuration
