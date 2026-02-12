@@ -6,8 +6,7 @@ import {
   TrendingUp,
   TrendingDown,
   Share2,
-  X,
-  Zap
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,25 +15,23 @@ import { useAuth } from "@/hooks/useAuth";
 import { BottomNavigation } from "@/components/navigation/BottomNavigation";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import biolosLogo from "@/assets/biolos-logo.png";
+import payvendasLogo from "@/assets/payvendas-logo.png";
 
 const Trading = () => {
   const { user, profile } = useAuth();
-  const [isDemoMode, setIsDemoMode] = useState(true);
-  const [demoBalance, setDemoBalance] = useState(10000);
   const [showPostPrompt, setShowPostPrompt] = useState(false);
   const [lastTradeResult, setLastTradeResult] = useState<{ isWin: boolean; amount: number; pair: string } | null>(null);
   const [postContent, setPostContent] = useState("");
   const [isPosting, setIsPosting] = useState(false);
 
-  const currentBalance = isDemoMode ? demoBalance : (profile?.balance || 0);
+  const currentBalance = profile?.balance || 0;
 
   const handleTradeComplete = (isWin: boolean, amount: number, pair: string) => {
-    if (!isDemoMode && user && profile?.kyc_status === 'approved') {
+    if (user) {
       setLastTradeResult({ isWin, amount, pair });
       setPostContent(isWin 
-        ? `Acabei de lucrar ${amount.toLocaleString('pt-AO')} AOA em ${pair}! 🚀💰`
-        : `Perdi ${amount.toLocaleString('pt-AO')} AOA em ${pair} 📉 Faz parte do jogo!`
+        ? `Acabei de lucrar ${amount.toLocaleString('pt-AO')} AOA em ${pair}!`
+        : `Perdi ${amount.toLocaleString('pt-AO')} AOA em ${pair}. Faz parte do jogo!`
       );
       setShowPostPrompt(true);
     }
@@ -70,7 +67,7 @@ const Trading = () => {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-[#0c1018] border-b border-white/5">
         <div className="flex items-center gap-3">
-          <img src={biolosLogo} alt="BIOLOS" className="h-8" />
+          <img src={payvendasLogo} alt="PayVendas" className="h-8" />
         </div>
         
         <div className="flex items-center gap-3">
@@ -82,19 +79,6 @@ const Trading = () => {
             </span>
             <span className="text-white/50 text-xs">AOA</span>
           </div>
-          
-          {/* Mode Toggle */}
-          <button
-            onClick={() => setIsDemoMode(!isDemoMode)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-              isDemoMode 
-                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
-                : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-            }`}
-          >
-            <Zap size={14} />
-            {isDemoMode ? 'DEMO' : 'REAL'}
-          </button>
         </div>
       </div>
 
@@ -108,32 +92,12 @@ const Trading = () => {
         </div>
       </div>
 
-      {/* Demo Mode Banner */}
-      <AnimatePresence>
-        {isDemoMode && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/20"
-          >
-            <p className="text-xs text-center text-amber-400">
-              🎮 Modo Demo - Pratique sem risco com dinheiro virtual
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Trading Chart - Full height */}
       <div className="flex-1 min-h-0 pb-16">
         <ProfessionalTradingChart 
-          isDemoMode={isDemoMode} 
+          isDemoMode={false} 
           balance={currentBalance}
-          onBalanceChange={(newBalance) => {
-            if (isDemoMode) {
-              setDemoBalance(newBalance);
-            }
-          }}
+          onBalanceChange={() => {}}
           onTradeComplete={handleTradeComplete}
         />
       </div>
@@ -163,7 +127,6 @@ const Trading = () => {
                 </button>
               </div>
 
-              {/* Result Badge */}
               <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl mb-4 ${
                 lastTradeResult.isWin 
                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
