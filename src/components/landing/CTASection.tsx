@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowRight, Gift, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
@@ -31,8 +31,8 @@ export const CTASection = () => {
           className="text-center max-w-3xl mx-auto"
         >
           <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full liquid-glass-dark text-white/90 text-sm font-semibold mb-10">
-            <Gift size={16} className="text-primary" />
-            <span>Bônus de 500 AOA ao criar conta</span>
+            <Sparkles size={16} className="text-primary" />
+            <span>Plataforma #1 de Vendas Digitais</span>
           </div>
 
           <h2 className="font-display text-4xl md:text-6xl font-extrabold text-white mb-8 tracking-tight leading-[1.1]">

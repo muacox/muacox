@@ -15,7 +15,6 @@ import Wallet from "./pages/Wallet";
 import Admin from "./pages/Admin";
 import Chat from "./pages/Chat";
 import PDFStore from "./pages/PDFStore";
-import InstallApp from "./pages/InstallApp";
 import Referrals from "./pages/Referrals";
 import NotFound from "./pages/NotFound";
 
@@ -39,7 +38,7 @@ const App = () => (
               <Route path="/carteira" element={<Wallet />} />
               <Route path="/chat" element={<Chat />} />
               <Route path="/loja" element={<PDFStore />} />
-              <Route path="/instalar" element={<InstallApp />} />
+              {/* PWA install page removed */}
               <Route path="/afiliados" element={<Referrals />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/dashboard" element={<Trading />} />

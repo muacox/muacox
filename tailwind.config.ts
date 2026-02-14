@@ -15,14 +15,10 @@ export default {
   	extend: {
   		fontFamily: {
   			sans: [
-  				'Poppins',
+  				'Plus Jakarta Sans',
   				'ui-sans-serif',
   				'system-ui',
-  				'sans-serif',
-  				'Apple Color Emoji',
-  				'Segoe UI Emoji',
-  				'Segoe UI Symbol',
-  				'Noto Color Emoji'
+  				'sans-serif'
   			],
   			display: [
   				'Sora',
@@ -32,20 +28,11 @@ export default {
   				'Crimson Text',
   				'ui-serif',
   				'Georgia',
-  				'Cambria',
-  				'Times New Roman',
-  				'Times',
   				'serif'
   			],
   			mono: [
   				'Roboto Mono',
   				'ui-monospace',
-  				'SFMono-Regular',
-  				'Menlo',
-  				'Monaco',
-  				'Consolas',
-  				'Liberation Mono',
-  				'Courier New',
   				'monospace'
   			]
   		},
