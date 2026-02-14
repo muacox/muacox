@@ -316,7 +316,7 @@ const Wallet = () => {
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Header */}
-      <div className="px-4 pt-6 pb-4 bg-white border-b border-border">
+      <div className="px-4 pt-6 pb-4 liquid-glass border-b border-border/50">
         <h1 className="font-display text-xl font-bold text-foreground mb-1">Carteira</h1>
         <p className="text-muted-foreground text-sm">Gerencie seus fundos e cartão virtual</p>
       </div>
@@ -531,7 +531,7 @@ const Wallet = () => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.03 }}
-                  className="flex items-center justify-between p-3 rounded-xl bg-white border border-border shadow-sm"
+                  className="flex items-center justify-between p-3 rounded-xl liquid-glass"
                 >
                   <div className="flex items-center gap-3">
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
@@ -608,7 +608,7 @@ const Wallet = () => {
               animate={{ y: 0 }}
               exit={{ y: 100 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white border border-border rounded-2xl w-full max-w-md p-6 shadow-xl"
+              className="liquid-glass rounded-2xl w-full max-w-md p-6 shadow-xl"
             >
               <div className="flex items-center justify-between mb-6">
                 <h3 className="font-bold text-lg text-foreground">Depositar</h3>
@@ -690,7 +690,7 @@ const Wallet = () => {
               animate={{ y: 0 }}
               exit={{ y: 100 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white border border-border rounded-2xl w-full max-w-md p-6 shadow-xl"
+              className="liquid-glass rounded-2xl w-full max-w-md p-6 shadow-xl"
             >
               <div className="flex items-center justify-between mb-6">
                 <h3 className="font-bold text-lg text-foreground">Levantar</h3>
@@ -779,7 +779,7 @@ const Wallet = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white border border-border rounded-2xl w-full max-w-sm p-6 shadow-xl text-center"
+              className="liquid-glass rounded-2xl w-full max-w-sm p-6 shadow-xl text-center"
             >
               <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="text-primary" size={28} />
