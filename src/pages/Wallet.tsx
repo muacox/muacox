@@ -44,7 +44,7 @@ const PAYMENT_METHODS = [
   { id: 'paypay', name: 'PayPay África', icon: paypayLogo, color: 'bg-cyan-500/20' },
 ];
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://shpfccohqkjootsbhuua.supabase.co";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 const Wallet = () => {
   const { user, profile, refreshProfile } = useAuth();
@@ -58,6 +58,8 @@ const Wallet = () => {
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showPaymentInfo, setShowPaymentInfo] = useState(false);
+  const [showLoadingSplash, setShowLoadingSplash] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Gerando referência...");
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentEntity, setPaymentEntity] = useState("01055");
   const [paymentAmount, setPaymentAmount] = useState(0);
@@ -156,7 +158,10 @@ const Wallet = () => {
       return;
     }
 
-    setProcessing(true);
+    // Close deposit modal and show loading splash
+    setShowDepositModal(false);
+    setShowLoadingSplash(true);
+    setLoadingMessage("Gerando referência de pagamento...");
 
     try {
       const { data: session } = await supabase.auth.getSession();
@@ -171,7 +176,7 @@ const Wallet = () => {
           type: 'deposit',
           amount: depositAmount,
           method: selectedMethod.name,
-          phone: phoneNumber.startsWith('+244') ? phoneNumber : phoneNumber
+          phone: phoneNumber
         })
       });
       
@@ -185,15 +190,14 @@ const Wallet = () => {
       setPaymentReference(result.reference || result.plinqpay_id || '');
       setPaymentEntity(result.entity || '01055');
       setPaymentAmount(depositAmount);
-      setShowDepositModal(false);
+      setShowLoadingSplash(false);
       setShowPaymentInfo(true);
       setAmount("");
       setPhoneNumber("");
       fetchTransactions();
     } catch (error: any) {
+      setShowLoadingSplash(false);
       toast.error(error.message || "Erro ao processar depósito");
-    } finally {
-      setProcessing(false);
     }
   };
 
@@ -221,16 +225,10 @@ const Wallet = () => {
       return;
     }
 
-    const bonusBalance = profile.bonus_balance || 0;
-    const realBalance = (profile.balance || 0) - bonusBalance;
-    const totalProfit = profile.total_profit || 0;
-
-    if (realBalance < withdrawAmount && totalProfit <= 0) {
-      toast.error("Você precisa ter lucro em trading para sacar o saldo de bônus");
-      return;
-    }
-
-    setProcessing(true);
+    // Close withdraw modal and show loading splash
+    setShowWithdrawModal(false);
+    setShowLoadingSplash(true);
+    setLoadingMessage("Processando levantamento...");
 
     try {
       const { data: session } = await supabase.auth.getSession();
@@ -255,6 +253,7 @@ const Wallet = () => {
         throw new Error(result.error || 'Erro ao processar levantamento');
       }
 
+      setShowLoadingSplash(false);
       toast.success(
         <div className="space-y-2">
           <p className="font-semibold">Levantamento solicitado!</p>
@@ -263,15 +262,13 @@ const Wallet = () => {
         { duration: 10000 }
       );
 
-      setShowWithdrawModal(false);
       setAmount("");
       setPhoneNumber("");
       refreshProfile();
       fetchTransactions();
     } catch (error: any) {
+      setShowLoadingSplash(false);
       toast.error(error.message || "Erro ao processar levantamento");
-    } finally {
-      setProcessing(false);
     }
   };
 
@@ -574,6 +571,27 @@ const Wallet = () => {
       </div>
 
       <BottomNavigation />
+
+      {/* Loading Splash Screen */}
+      <AnimatePresence>
+        {showLoadingSplash && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-background z-50 flex flex-col items-center justify-center"
+          >
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+              className="w-16 h-16 rounded-full border-4 border-muted border-t-primary mb-6"
+            />
+            <img src={payvendasLogo} alt="PayVendas" className="h-10 mb-4" />
+            <p className="text-foreground font-semibold text-lg">{loadingMessage}</p>
+            <p className="text-muted-foreground text-sm mt-2">Aguarde um momento...</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Deposit Modal */}
       <AnimatePresence>
