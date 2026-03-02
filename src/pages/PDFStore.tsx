@@ -53,6 +53,16 @@ interface PendingPurchase {
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const ENTITY_CODE = "01055";
 
+interface PaymentWebhookResponse {
+  error?: string;
+  already_purchased?: boolean;
+  transaction_id?: string;
+  reference?: string;
+  entity?: string;
+  status?: string;
+  file_url?: string | null;
+}
+
 const PDFStore = () => {
   const { user, profile } = useAuth();
   const [products, setProducts] = useState<PDFProduct[]>([]);

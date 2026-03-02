@@ -10,6 +10,7 @@ const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const PLINQPAY_API_URL = "https://api.plinqpay.com/v1/transaction";
+const PLINQPAY_PUBLIC_KEY = Deno.env.get("PLINQPAY_PUBLIC_KEY") || "";
 const PLINQPAY_SECRET_KEY = Deno.env.get("PLINQPAY_SECRET_KEY") || Deno.env.get("PLINQPAY_API_KEY") || "";
 const ENTITY_CODE = "01055";
 
@@ -66,15 +67,104 @@ async function getAuthUser(req: Request) {
   return user;
 }
 
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function normalizeAngolaPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 9) return null;
+  const national = digits.startsWith("244") ? digits.slice(3) : digits;
+  if (national.length !== 9 || !national.startsWith("9")) return null;
+  return `+244${national}`;
+}
+
+function normalizeIban(iban: string) {
+  return iban.replace(/\s+/g, "").toUpperCase();
+}
+
+function isValidIban(iban: string) {
+  return /^[A-Z]{2}[0-9A-Z]{13,32}$/.test(normalizeIban(iban));
+}
+
+async function parsePlinqPayResponse(response: Response) {
+  const raw = await response.text();
+  try {
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return { message: raw || "Resposta inválida da PlinqPay" };
+  }
+}
+
+async function createPlinqPayReference(payload: PlinqPayTransaction) {
+  const apiKey = PLINQPAY_PUBLIC_KEY || PLINQPAY_SECRET_KEY;
+
+  if (!apiKey) {
+    return { ok: false, status: 500, result: { message: "PlinqPay API key não configurada" } };
+  }
+
+  const plinqpayResponse = await fetch(PLINQPAY_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "api-key": apiKey,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await parsePlinqPayResponse(plinqpayResponse);
+  return {
+    ok: plinqpayResponse.ok,
+    status: plinqpayResponse.status,
+    result,
+  };
+}
+
+async function verifyPlinqPaySignature(rawBody: string, signature: string) {
+  if (!PLINQPAY_SECRET_KEY) return true;
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(PLINQPAY_SECRET_KEY),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+
+  const signedBuffer = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody));
+  const expected = Array.from(new Uint8Array(signedBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  return signature.trim().toLowerCase() === expected;
+}
+
 // Route handler
 Deno.serve(async (req) => {
   const corsResp = handleCors(req);
   if (corsResp) return corsResp;
 
   const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/payment-webhook/, "");
+  const path = url.pathname
+    .replace(/^\/functions\/v1\/payment-webhook/, "")
+    .replace(/^\/payment-webhook/, "") || "/";
 
   try {
+    if (req.method === "POST" && path === "/") {
+      const clonedReq = req.clone();
+      const body = await clonedReq.json().catch(() => ({}));
+      const action = typeof body?.action === "string" ? body.action : "";
+
+      if (action === "initiate") return await handleInitiate(req);
+      if (action === "purchase-pdf") return await handlePurchasePdf(req);
+      if (action === "admin-process") return await handleAdminProcess(req);
+      if (action === "purchase-status") {
+        const txId = typeof body?.transaction_id === "string" ? body.transaction_id : "";
+        if (!txId) return jsonResponse({ error: "transaction_id obrigatório" }, 400);
+        return await handlePurchaseStatus(req, txId);
+      }
+    }
+
     // PlinqPay callback
     if (req.method === "POST" && path === "/plinqpay-callback") {
       return await handleCallback(req);
@@ -116,7 +206,23 @@ Deno.serve(async (req) => {
 
 // ---- CALLBACK ----
 async function handleCallback(req: Request): Promise<Response> {
-  const payload: PlinqPayCallback = await req.json();
+  const rawBody = await req.text();
+  let payload: PlinqPayCallback;
+
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return jsonResponse({ error: "Payload inválido" }, 400);
+  }
+
+  const signature = req.headers.get("signature") || req.headers.get("x-signature");
+  if (signature) {
+    const valid = await verifyPlinqPaySignature(rawBody, signature);
+    if (!valid) {
+      return jsonResponse({ error: "Assinatura inválida" }, 401);
+    }
+  }
+
   console.log("PlinqPay callback received:", JSON.stringify(payload));
 
   const { data: transaction, error: findError } = await supabase
@@ -249,10 +355,29 @@ async function handleInitiate(req: Request): Promise<Response> {
   const user = await getAuthUser(req);
   if (!user) return jsonResponse({ error: "Unauthorized" }, 401);
 
-  const { type, amount, method, phone, client_name, client_email, client_phone } = await req.json();
+  const payload = await req.json().catch(() => null);
+  if (!payload) {
+    return jsonResponse({ error: "Payload inválido" }, 400);
+  }
 
-  if (!type || !amount) {
-    return jsonResponse({ error: "Missing required fields" }, 400);
+  const type = String(payload.type || "").trim();
+  const amount = Number(payload.amount);
+  const method = String(payload.method || "").trim();
+  const clientName = String(payload.client_name || "").trim();
+  const clientEmail = String(payload.client_email || "").trim().toLowerCase();
+  const clientPhone = String(payload.client_phone || payload.phone || "").trim();
+  const clientIban = normalizeIban(String(payload.client_iban || "").trim());
+
+  if (!["deposit", "withdrawal"].includes(type)) {
+    return jsonResponse({ error: "Tipo de transação inválido" }, 400);
+  }
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return jsonResponse({ error: "Valor inválido" }, 400);
+  }
+
+  if (!clientName || !isValidEmail(clientEmail)) {
+    return jsonResponse({ error: "Nome e email válidos são obrigatórios" }, 400);
   }
 
   const { data: profile } = await supabase
@@ -265,10 +390,12 @@ async function handleInitiate(req: Request): Promise<Response> {
     return jsonResponse({ error: "Profile not found" }, 404);
   }
 
+  let normalizedPhone = "";
+
   // Validate withdrawal
   if (type === "withdrawal") {
-    if (!client_phone && !phone) {
-      return jsonResponse({ error: "Número de telefone obrigatório para levantamento" }, 400);
+    if (!clientIban || !isValidIban(clientIban)) {
+      return jsonResponse({ error: "IBAN válido é obrigatório para levantamento manual" }, 400);
     }
     if (amount < 200) {
       return jsonResponse({ error: "Valor mínimo de levantamento: 200 AOA" }, 400);
@@ -280,7 +407,7 @@ async function handleInitiate(req: Request): Promise<Response> {
       return jsonResponse({ error: "Saldo insuficiente" }, 400);
     }
 
-    // Deduct from balance immediately
+    // Deduct from balance immediately (refund on admin reject)
     await supabase
       .from("profiles")
       .update({ balance: (profile.balance || 0) - amount })
@@ -289,8 +416,9 @@ async function handleInitiate(req: Request): Promise<Response> {
 
   // Validate deposit
   if (type === "deposit") {
-    if (!client_name || !client_email || !client_phone) {
-      return jsonResponse({ error: "Nome, email e número são obrigatórios" }, 400);
+    normalizedPhone = normalizeAngolaPhone(clientPhone) || "";
+    if (!normalizedPhone) {
+      return jsonResponse({ error: "Número de telefone válido é obrigatório" }, 400);
     }
     if (amount < 12) {
       return jsonResponse({ error: "Valor mínimo de depósito: 12 AOA" }, 400);
@@ -300,8 +428,6 @@ async function handleInitiate(req: Request): Promise<Response> {
     }
   }
 
-  const withdrawPhone = client_phone || phone || "";
-
   // Create transaction
   const { data: transaction, error: txError } = await supabase
     .from("transactions")
@@ -310,10 +436,10 @@ async function handleInitiate(req: Request): Promise<Response> {
       type,
       amount,
       status: "pending",
-      method: method || "PlinqPay",
-      description: type === "withdrawal" 
-        ? `Levantamento via ${method || 'PlinqPay'} - ${client_name || ''} - ${withdrawPhone}`
-        : `Depósito via PlinqPay - ${client_name || ''}`
+      method: type === "withdrawal" ? "Manual IBAN" : (method || "PlinqPay REFERENCE"),
+      description: type === "withdrawal"
+        ? `Levantamento Manual via IBAN ${clientIban} - ${clientName}`
+        : `Depósito via PlinqPay - ${clientName}`,
     })
     .select()
     .single();
@@ -321,81 +447,68 @@ async function handleInitiate(req: Request): Promise<Response> {
   if (txError) throw txError;
 
   if (type === "deposit") {
-    // Generate reference via PlinqPay API
-    const formattedPhone = client_phone.startsWith("+244") ? client_phone : `+244${client_phone}`;
-    
     const plinqpayPayload: PlinqPayTransaction = {
       externalId: transaction.id,
       callbackUrl: getCallbackUrl(),
       method: "REFERENCE",
       client: {
-        name: client_name,
-        email: client_email,
-        phone: formattedPhone
+        name: clientName,
+        email: clientEmail,
+        phone: normalizedPhone,
       },
       items: [
         {
           title: "Depósito PayVendas",
           price: amount,
-          quantity: 1
-        }
+          quantity: 1,
+        },
       ],
-      amount: 1
+      amount: 1,
     };
 
     console.log("Creating PlinqPay transaction:", JSON.stringify(plinqpayPayload));
 
-    const plinqpayResponse = await fetch(PLINQPAY_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': PLINQPAY_SECRET_KEY
-      },
-      body: JSON.stringify(plinqpayPayload)
-    });
-
-    const plinqpayResult = await plinqpayResponse.json();
-    console.log("PlinqPay response:", JSON.stringify(plinqpayResult));
+    const plinqpayResponse = await createPlinqPayReference(plinqpayPayload);
+    console.log("PlinqPay response:", JSON.stringify(plinqpayResponse.result));
 
     if (!plinqpayResponse.ok) {
       await supabase
         .from("transactions")
-        .update({ status: "failed", description: `Erro PlinqPay: ${JSON.stringify(plinqpayResult)}` })
+        .update({ status: "failed", description: `Erro PlinqPay: ${JSON.stringify(plinqpayResponse.result)}` })
         .eq("id", transaction.id);
 
-      return jsonResponse({ 
-        error: plinqpayResult.message || "Erro ao criar transação de pagamento" 
+      return jsonResponse({
+        error: plinqpayResponse.result?.message || "Erro ao criar transação de pagamento",
       }, 400);
     }
 
     await supabase
       .from("transactions")
-      .update({ 
-        description: `Depósito via PlinqPay - Ref: ${plinqpayResult.reference || plinqpayResult.id} - ${client_name}`
+      .update({
+        description: `Depósito via PlinqPay - Ref: ${plinqpayResponse.result.reference || plinqpayResponse.result.id} - ${clientName}`,
       })
       .eq("id", transaction.id);
 
     return jsonResponse({
       success: true,
       transaction_id: transaction.id,
-      plinqpay_id: plinqpayResult.id,
-      reference: plinqpayResult.reference,
+      plinqpay_id: plinqpayResponse.result.id,
+      reference: plinqpayResponse.result.reference,
       entity: ENTITY_CODE,
       status: "pending",
-      instructions: `Entidade: ${ENTITY_CODE}\nReferência: ${plinqpayResult.reference || plinqpayResult.id}\nValor: ${amount.toLocaleString()} AOA\n\nPague via Multicaixa Express ou PayPay África.`,
-      message: "Siga as instruções para completar o depósito"
-    });
-
-  } else {
-    // Withdrawals - admin approves
-    return jsonResponse({
-      success: true,
-      transaction_id: transaction.id,
-      status: "pending",
-      instructions: `Seu levantamento de ${amount.toLocaleString()} AOA foi solicitado.\nSerá processado pelo administrador em até 24 horas úteis.`,
-      message: "Seu levantamento está sendo processado"
+      instructions: `Entidade: ${ENTITY_CODE}\nReferência: ${plinqpayResponse.result.reference || plinqpayResponse.result.id}\nValor: ${amount.toLocaleString()} AOA\n\nPague via Multicaixa Express ou PayPay África.`,
+      message: "Siga as instruções para completar o depósito",
     });
   }
+
+  // Withdrawals - manual admin processing by IBAN
+  return jsonResponse({
+    success: true,
+    transaction_id: transaction.id,
+    status: "pending",
+    instructions: `Seu levantamento de ${amount.toLocaleString()} AOA foi solicitado para o IBAN ${clientIban}.\nSerá processado manualmente pelo administrador em até 24 horas úteis.`,
+    message: "Seu levantamento manual está sendo processado",
+  });
 }
 
 // ---- PURCHASE PDF ----
@@ -403,14 +516,22 @@ async function handlePurchasePdf(req: Request): Promise<Response> {
   const user = await getAuthUser(req);
   if (!user) return jsonResponse({ error: "Unauthorized" }, 401);
 
-  const { product_id, client_name, client_email, client_phone } = await req.json();
-
-  if (!product_id) {
-    return jsonResponse({ error: "Missing required fields" }, 400);
+  const payload = await req.json().catch(() => null);
+  if (!payload) {
+    return jsonResponse({ error: "Payload inválido" }, 400);
   }
 
-  if (!client_name || !client_email || !client_phone) {
-    return jsonResponse({ error: "Nome, email e número são obrigatórios para o checkout" }, 400);
+  const productId = String(payload.product_id || "").trim();
+  const clientName = String(payload.client_name || "").trim();
+  const clientEmail = String(payload.client_email || "").trim().toLowerCase();
+  const normalizedPhone = normalizeAngolaPhone(String(payload.client_phone || "").trim());
+
+  if (!productId) {
+    return jsonResponse({ error: "Produto inválido" }, 400);
+  }
+
+  if (!clientName || !isValidEmail(clientEmail) || !normalizedPhone) {
+    return jsonResponse({ error: "Nome, email e número válidos são obrigatórios para o checkout" }, 400);
   }
 
   const { data: profile } = await supabase
@@ -426,7 +547,7 @@ async function handlePurchasePdf(req: Request): Promise<Response> {
   const { data: product } = await supabase
     .from("pdf_products")
     .select("*")
-    .eq("id", product_id)
+    .eq("id", productId)
     .eq("status", "approved")
     .single();
 
@@ -442,7 +563,7 @@ async function handlePurchasePdf(req: Request): Promise<Response> {
     .from("pdf_purchases")
     .select("id")
     .eq("user_id", user.id)
-    .eq("product_id", product_id)
+    .eq("product_id", productId)
     .single();
 
   if (existingPurchase) {
@@ -456,73 +577,62 @@ async function handlePurchasePdf(req: Request): Promise<Response> {
       type: "pdf_purchase",
       amount: product.price,
       status: "pending",
-      method: "PlinqPay",
-      description: `Compra PDF: ${product.title} - product:${product.id}`
+      method: "PlinqPay REFERENCE",
+      description: `Compra PDF: ${product.title} - product:${product.id}`,
     })
     .select()
     .single();
 
   if (txError) throw txError;
 
-  const formattedPhone = client_phone.startsWith("+244") ? client_phone : `+244${client_phone}`;
-
   const plinqpayPayload: PlinqPayTransaction = {
     externalId: transaction.id,
     callbackUrl: getCallbackUrl(),
     method: "REFERENCE",
     client: {
-      name: client_name,
-      email: client_email,
-      phone: formattedPhone
+      name: clientName,
+      email: clientEmail,
+      phone: normalizedPhone,
     },
     items: [
       {
         title: product.title,
         price: product.price,
-        quantity: 1
-      }
+        quantity: 1,
+      },
     ],
-    amount: 1
+    amount: 1,
   };
 
-  const plinqpayResponse = await fetch(PLINQPAY_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'api-key': PLINQPAY_SECRET_KEY
-    },
-    body: JSON.stringify(plinqpayPayload)
-  });
-
-  const plinqpayResult = await plinqpayResponse.json();
+  const plinqpayResponse = await createPlinqPayReference(plinqpayPayload);
 
   if (!plinqpayResponse.ok) {
     await supabase
       .from("transactions")
-      .update({ status: "failed" })
+      .update({ status: "failed", description: `Erro PlinqPay: ${JSON.stringify(plinqpayResponse.result)}` })
       .eq("id", transaction.id);
 
-    return jsonResponse({ 
-      error: plinqpayResult.message || "Erro ao criar pagamento" 
+    return jsonResponse({
+      error: plinqpayResponse.result?.message || "Erro ao criar pagamento",
     }, 400);
   }
 
   await supabase
     .from("transactions")
-    .update({ 
-      description: `${transaction.description} - Ref: ${plinqpayResult.reference || plinqpayResult.id}`
+    .update({
+      description: `${transaction.description} - Ref: ${plinqpayResponse.result.reference || plinqpayResponse.result.id}`,
     })
     .eq("id", transaction.id);
 
   return jsonResponse({
     success: true,
     transaction_id: transaction.id,
-    reference: plinqpayResult.reference,
+    reference: plinqpayResponse.result.reference,
     entity: ENTITY_CODE,
     status: "pending",
     product_title: product.title,
     amount: product.price,
-    instructions: `Entidade: ${ENTITY_CODE}\nReferência: ${plinqpayResult.reference || plinqpayResult.id}\nValor: ${product.price.toLocaleString()} AOA\n\nPague via Multicaixa Express ou PayPay África.`
+    instructions: `Entidade: ${ENTITY_CODE}\nReferência: ${plinqpayResponse.result.reference || plinqpayResponse.result.id}\nValor: ${product.price.toLocaleString()} AOA\n\nPague via Multicaixa Express ou PayPay África.`,
   });
 }
 

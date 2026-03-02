@@ -48,7 +48,15 @@ const PAYMENT_METHODS = [
   { id: 'paypay', name: 'PayPay África', icon: paypayLogo, color: 'bg-cyan-500/20' },
 ];
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+interface PaymentWebhookResponse {
+  success?: boolean;
+  error?: string;
+  transaction_id?: string;
+  reference?: string;
+  plinqpay_id?: string;
+  entity?: string;
+  message?: string;
+}
 
 const Wallet = () => {
   const { user, profile, refreshProfile } = useAuth();
@@ -74,6 +82,7 @@ const Wallet = () => {
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
+  const [clientIban, setClientIban] = useState("");
 
   useEffect(() => {
     if (user) {
@@ -102,6 +111,21 @@ const Wallet = () => {
     }
   };
 
+  const callPaymentWebhook = async (payload: Record<string, unknown>) => {
+    const { data, error } = await supabase.functions.invoke('payment-webhook', { body: payload });
+
+    if (error) {
+      throw new Error(error.message || 'Erro de comunicação com o servidor de pagamentos');
+    }
+
+    const response = (data || {}) as PaymentWebhookResponse;
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    return response;
+  };
+
   const copyIban = () => {
     if (profile?.iban_virtual) {
       navigator.clipboard.writeText(profile.iban_virtual);
@@ -111,7 +135,7 @@ const Wallet = () => {
     }
   };
 
-  const validateCheckoutForm = () => {
+  const validateCheckoutForm = (isWithdraw = false) => {
     if (!clientName.trim()) {
       toast.error("Nome completo é obrigatório");
       return false;
@@ -120,6 +144,16 @@ const Wallet = () => {
       toast.error("Email válido é obrigatório");
       return false;
     }
+
+    if (isWithdraw) {
+      const ibanNormalized = clientIban.replace(/\s+/g, "").toUpperCase();
+      if (!/^[A-Z]{2}[0-9A-Z]{13,32}$/.test(ibanNormalized)) {
+        toast.error("IBAN válido é obrigatório para levantamento manual");
+        return false;
+      }
+      return true;
+    }
+
     if (!clientPhone.trim() || clientPhone.replace(/\D/g, "").length < 9) {
       toast.error("Número de telefone válido é obrigatório");
       return false;
@@ -140,37 +174,23 @@ const Wallet = () => {
       toast.error("Valor máximo de depósito: 1.000.000 AOA");
       return;
     }
-    if (!validateCheckoutForm()) return;
+    if (!validateCheckoutForm(false)) return;
 
     setShowDepositModal(false);
     setShowLoadingSplash(true);
     setLoadingMessage("Gerando referência de pagamento...");
 
     try {
-      const { data: session } = await supabase.auth.getSession();
       const phoneFormatted = clientPhone.replace(/\D/g, "");
-      
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/payment-webhook/initiate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.session?.access_token}`
-        },
-        body: JSON.stringify({
-          type: 'deposit',
-          amount: depositAmount,
-          method: selectedMethod.name,
-          client_name: clientName.trim(),
-          client_email: clientEmail.trim(),
-          client_phone: phoneFormatted
-        })
+      const result = await callPaymentWebhook({
+        action: 'initiate',
+        type: 'deposit',
+        amount: depositAmount,
+        method: selectedMethod.name,
+        client_name: clientName.trim(),
+        client_email: clientEmail.trim(),
+        client_phone: phoneFormatted,
       });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Erro ao processar depósito');
-      }
 
       setPaymentReference(result.reference || result.plinqpay_id || '');
       setPaymentEntity(result.entity || '01055');
@@ -202,43 +222,30 @@ const Wallet = () => {
       toast.error("Saldo insuficiente");
       return;
     }
-    if (!validateCheckoutForm()) return;
+    if (!validateCheckoutForm(true)) return;
 
     setShowWithdrawModal(false);
     setShowLoadingSplash(true);
-    setLoadingMessage("Processando levantamento...");
+    setLoadingMessage("Processando levantamento manual...");
 
     try {
-      const { data: session } = await supabase.auth.getSession();
-      const phoneFormatted = clientPhone.replace(/\D/g, "");
-      
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/payment-webhook/initiate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.session?.access_token}`
-        },
-        body: JSON.stringify({
-          type: 'withdrawal',
-          amount: withdrawAmount,
-          method: selectedMethod.name,
-          client_name: clientName.trim(),
-          client_email: clientEmail.trim(),
-          client_phone: phoneFormatted
-        })
+      const ibanFormatted = clientIban.replace(/\s+/g, '').toUpperCase();
+
+      await callPaymentWebhook({
+        action: 'initiate',
+        type: 'withdrawal',
+        amount: withdrawAmount,
+        method: 'Manual IBAN',
+        client_name: clientName.trim(),
+        client_email: clientEmail.trim(),
+        client_iban: ibanFormatted,
       });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Erro ao processar levantamento');
-      }
 
       setShowLoadingSplash(false);
       toast.success(
         <div className="space-y-2">
-          <p className="font-semibold">Levantamento solicitado!</p>
-          <p className="text-xs">Seu saque de {withdrawAmount.toLocaleString('pt-AO')} AOA será processado pelo administrador para {clientName} ({clientPhone}) via {selectedMethod.name}.</p>
+          <p className="font-semibold">Levantamento manual solicitado!</p>
+          <p className="text-xs">Seu saque de {withdrawAmount.toLocaleString('pt-AO')} AOA será processado manualmente pelo admin para o IBAN {ibanFormatted}.</p>
         </div>,
         { duration: 10000 }
       );
@@ -331,39 +338,45 @@ const Wallet = () => {
 
       <div>
         <Label className="text-sm text-muted-foreground flex items-center gap-1.5 mb-1.5">
-          <Phone size={14} /> Número de Telefone *
+          <Phone size={14} /> {isWithdraw ? 'IBAN de Destino *' : 'Número de Telefone *'}
         </Label>
         <Input
-          type="tel"
-          value={clientPhone}
-          onChange={(e) => setClientPhone(e.target.value)}
-          placeholder="923456789"
+          type="text"
+          value={isWithdraw ? clientIban : clientPhone}
+          onChange={(e) => isWithdraw ? setClientIban(e.target.value.toUpperCase()) : setClientPhone(e.target.value)}
+          placeholder={isWithdraw ? "AO06xxxxxxxxxxxxxxxxxxxx" : "923456789"}
           className="bg-secondary border-border text-foreground"
         />
       </div>
 
       <div>
         <Label className="text-sm text-muted-foreground block mb-2">
-          {isWithdraw ? 'Receber via' : 'Método de Pagamento'}
+          {isWithdraw ? 'Processamento' : 'Método de Pagamento'}
         </Label>
-        <div className="space-y-2">
-          {PAYMENT_METHODS.map((method) => (
-            <button
-              key={method.id}
-              onClick={() => setSelectedMethod(method)}
-              className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
-                selectedMethod.id === method.id
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-primary/50'
-              }`}
-            >
-              <div className={`w-10 h-10 rounded-lg ${method.color} flex items-center justify-center p-1.5`}>
-                <img src={method.icon} alt={method.name} className="w-full h-full object-contain" />
-              </div>
-              <span className="text-foreground font-medium">{method.name}</span>
-            </button>
-          ))}
-        </div>
+        {isWithdraw ? (
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-foreground">
+            Levantamento manual por IBAN (processado pelo admin)
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {PAYMENT_METHODS.map((method) => (
+              <button
+                key={method.id}
+                onClick={() => setSelectedMethod(method)}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
+                  selectedMethod.id === method.id
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-lg ${method.color} flex items-center justify-center p-1.5`}>
+                  <img src={method.icon} alt={method.name} className="w-full h-full object-contain" />
+                </div>
+                <span className="text-foreground font-medium">{method.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div>
