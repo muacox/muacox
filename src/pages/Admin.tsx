@@ -12,13 +12,10 @@ import {
   Eye,
   DollarSign,
   ArrowLeft,
-  TrendingUp,
   FileText,
-  Wallet,
   Ban,
   CreditCard,
   ArrowDownUp,
-  BarChart3
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -68,18 +65,6 @@ interface PdfProduct {
   user_name?: string;
 }
 
-interface Trade {
-  id: string;
-  user_id: string;
-  pair: string;
-  direction: string;
-  amount: number;
-  is_win: boolean | null;
-  profit_loss: number | null;
-  admin_commission: number | null;
-  created_at: string;
-}
-
 // Admin email
 const ADMIN_EMAIL = 'isaacmilagre9@gmail.com';
 
@@ -89,7 +74,6 @@ const Admin = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pdfProducts, setPdfProducts] = useState<PdfProduct[]>([]);
-  const [trades, setTrades] = useState<Trade[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState("users");
@@ -100,8 +84,6 @@ const Admin = () => {
     totalBalance: 0,
     pendingTransactions: 0,
     pendingPdfs: 0,
-    totalCommissions: 0,
-    totalTrades: 0
   });
 
   useEffect(() => {
@@ -122,7 +104,6 @@ const Admin = () => {
       fetchUsers(),
       fetchTransactions(),
       fetchPdfProducts(),
-      fetchTrades()
     ]);
     setLoadingData(false);
   };
@@ -186,21 +167,6 @@ const Admin = () => {
       }));
 
       setPdfProducts(productsWithNames);
-    }
-  };
-
-  const fetchTrades = async () => {
-    const { data } = await supabase
-      .from('trades')
-      .select('*')
-      .eq('is_demo', false)
-      .order('created_at', { ascending: false })
-      .limit(100);
-    
-    if (data) {
-      setTrades(data);
-      const totalCommissions = data.reduce((sum, t) => sum + (t.admin_commission || 0), 0);
-      setStats(prev => ({ ...prev, totalCommissions, totalTrades: data.length }));
     }
   };
 
@@ -431,8 +397,8 @@ const Admin = () => {
           <GlassCard className="p-3 bg-[#0d1421] border-[#1e2a3a]">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-400 text-xs">Comissões</p>
-                <p className="text-xl font-bold text-emerald-400">{stats.totalCommissions.toLocaleString('pt-AO')}</p>
+                <p className="text-slate-400 text-xs">Saldo Total</p>
+                <p className="text-xl font-bold text-emerald-400">{stats.totalBalance.toLocaleString('pt-AO')}</p>
               </div>
               <DollarSign className="text-emerald-500" size={20} />
             </div>
@@ -441,10 +407,10 @@ const Admin = () => {
           <GlassCard className="p-3 bg-[#0d1421] border-[#1e2a3a]">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-400 text-xs">Trades Reais</p>
-                <p className="text-xl font-bold text-[#1e88e5]">{stats.totalTrades}</p>
+                <p className="text-slate-400 text-xs">PDFs Pendentes</p>
+                <p className="text-xl font-bold text-[#1e88e5]">{pendingPdfs.length}</p>
               </div>
-              <BarChart3 className="text-[#1e88e5]" size={20} />
+              <FileText className="text-[#1e88e5]" size={20} />
             </div>
           </GlassCard>
         </div>
@@ -473,10 +439,6 @@ const Admin = () => {
                   {pendingPdfs.length}
                 </span>
               )}
-            </TabsTrigger>
-            <TabsTrigger value="trades" className="flex-1 data-[state=active]:bg-[#1e88e5]">
-              <TrendingUp size={14} className="mr-1" />
-              Trades
             </TabsTrigger>
           </TabsList>
 
@@ -807,65 +769,6 @@ const Admin = () => {
           </TabsContent>
 
           {/* Trades Tab */}
-          <TabsContent value="trades">
-            <GlassCard className="bg-[#0d1421] border-[#1e2a3a]">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-display font-semibold text-white text-sm">
-                  Histórico de Trades Reais
-                </h2>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-slate-400">Comissões Totais:</span>
-                  <span className="font-bold text-emerald-400">
-                    {stats.totalCommissions.toLocaleString('pt-AO')} AOA
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {trades.map((t, index) => (
-                  <motion.div
-                    key={t.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: index * 0.03 }}
-                    className="p-3 rounded-xl bg-[#1e2a3a]/50"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                          t.direction === 'call' ? 'bg-emerald-500/20' : 'bg-red-500/20'
-                        }`}>
-                          <TrendingUp className={t.direction === 'call' ? 'text-emerald-400' : 'text-red-400'} size={16} />
-                        </div>
-                        <div>
-                          <p className="font-medium text-white text-sm">{t.pair}</p>
-                          <p className="text-xs text-slate-400">
-                            {t.direction.toUpperCase()} - {t.amount.toLocaleString('pt-AO')} AOA
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className={`font-bold ${t.is_win ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {t.is_win ? '+' : ''}{(t.profit_loss || 0).toLocaleString('pt-AO')} AOA
-                        </p>
-                        {!t.is_win && t.admin_commission && t.admin_commission > 0 && (
-                          <p className="text-xs text-amber-400">
-                            Comissão: +{t.admin_commission.toLocaleString('pt-AO')} AOA
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-
-                {trades.length === 0 && (
-                  <div className="text-center py-8 text-slate-400 text-sm">
-                    Nenhum trade encontrado
-                  </div>
-                )}
-              </div>
-            </GlassCard>
-          </TabsContent>
         </Tabs>
       </main>
     </div>

@@ -15,12 +15,12 @@ const features = [
   {
     icon: Wallet,
     title: "Carteira Digital",
-    description: "Receba pagamentos e faça saques via Multicaixa Express e PayPay África.",
+    description: "Receba pagamentos por referência PlinqPay e faça saques via IBAN.",
   },
   {
     icon: Users,
     title: "Comunidade",
-    description: "Conecte-se com outros criadores e traders. Partilhe conhecimento e resultados.",
+    description: "Conecte-se com outros criadores de conteúdo. Partilhe conhecimento e resultados.",
   },
   {
     icon: Shield,
@@ -30,7 +30,7 @@ const features = [
   {
     icon: Gift,
     title: "Programa de Afiliados",
-    description: "Ganhe 5% de comissão sobre os lucros de trading dos usuários que você indicar.",
+    description: "Ganhe 5% de comissão sobre as vendas dos usuários que você indicar.",
   },
 ];
 
@@ -53,7 +53,7 @@ export const FeaturesSection = () => {
             </span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto leading-relaxed">
-            Uma plataforma completa para criadores de conteúdo e traders em Angola e Moçambique.
+            Uma plataforma completa para infoprodutores e criadores de conteúdo em Angola e Moçambique.
           </p>
         </motion.div>
 

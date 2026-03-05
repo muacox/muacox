@@ -282,7 +282,7 @@ const Wallet = () => {
       case 'withdrawal': return 'Levantamento';
       case 'wallet_activation': return 'Ativação Carteira';
       case 'pdf_purchase': return 'Compra PDF';
-      case 'trade': return 'Trading';
+      case 'trade': return 'Transação';
       case 'chuva_sent': return 'Chuva Enviada';
       case 'chuva_received': return 'Chuva Recebida';
       default: return type;
