@@ -16,7 +16,14 @@ import {
   User,
   Mail,
   Phone,
-  Shield
+  Shield,
+  Star,
+  TrendingUp,
+  BookOpen,
+  Search,
+  Filter,
+  Copy,
+  Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +57,6 @@ interface PendingPurchase {
   status: string;
 }
 
-
 const ENTITY_CODE = "01055";
 
 interface PaymentWebhookResponse {
@@ -71,6 +77,8 @@ const PDFStore = () => {
   const [activeTab, setActiveTab] = useState<'loja' | 'meus'>('loja');
   const [loading, setLoading] = useState(true);
   const [purchasedIds, setPurchasedIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'price_low' | 'price_high'>('recent');
   
   // Purchase state
   const [showLoadingSplash, setShowLoadingSplash] = useState(false);
@@ -108,6 +116,7 @@ const PDFStore = () => {
     };
   }, [user, profile]);
 
+  // Realtime listener for purchase status
   useEffect(() => {
     if (!pendingPurchase?.transactionId || !showPurchaseInfo || !user) return;
 
@@ -130,11 +139,9 @@ const PDFStore = () => {
 
           if (status === 'completed') {
             toast.success("Pagamento confirmado! Baixando PDF...");
-
             const { data: statusData } = await supabase.functions.invoke('payment-webhook', {
               body: { action: 'purchase-status', transaction_id: pendingPurchase.transactionId }
             });
-
             const parsed = (statusData || {}) as PaymentWebhookResponse;
             if (parsed.file_url) {
               downloadPDF(parsed.file_url, pendingPurchase.productTitle);
@@ -147,23 +154,17 @@ const PDFStore = () => {
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [pendingPurchase?.transactionId, pendingPurchase?.productTitle, showPurchaseInfo, user]);
 
   const fetchProducts = async () => {
     setLoading(true);
-    
     const { data: approvedProducts } = await supabase
       .from('pdf_products')
       .select('*')
       .eq('status', 'approved')
       .order('created_at', { ascending: false });
-    
-    if (approvedProducts) {
-      setProducts(approvedProducts);
-    }
+    if (approvedProducts) setProducts(approvedProducts);
 
     if (user) {
       const { data: userProducts } = await supabase
@@ -171,61 +172,53 @@ const PDFStore = () => {
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      
-      if (userProducts) {
-        setMyProducts(userProducts);
-      }
+      if (userProducts) setMyProducts(userProducts);
 
       const { data: purchases } = await supabase
         .from('pdf_purchases')
         .select('product_id')
         .eq('user_id', user.id);
-      
-      if (purchases) {
-        setPurchasedIds(purchases.map(p => p.product_id));
-      }
+      if (purchases) setPurchasedIds(purchases.map(p => p.product_id));
     }
-    
     setLoading(false);
   };
 
+  const filteredProducts = products
+    .filter(p => {
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      return p.title.toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'popular': return (b.downloads_count || 0) - (a.downloads_count || 0);
+        case 'price_low': return a.price - b.price;
+        case 'price_high': return b.price - a.price;
+        default: return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+    });
+
   const handleCreateProduct = async () => {
     if (!user || !profile) return;
-
     if (!title.trim() || !price || !pdfFile) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
-
     setUploading(true);
-
     try {
       const fileExt = pdfFile.name.split('.').pop();
       const filePath = `${user.id}/${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('pdf-products')
-        .upload(filePath, pdfFile);
-
+      const { error: uploadError } = await supabase.storage.from('pdf-products').upload(filePath, pdfFile);
       if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('pdf-products')
-        .getPublicUrl(filePath);
+      const { data: urlData } = supabase.storage.from('pdf-products').getPublicUrl(filePath);
 
       let coverUrl = null;
       if (coverImage) {
         const imgExt = coverImage.name.split('.').pop();
         const imgPath = `${user.id}/covers/${Date.now()}.${imgExt}`;
-        
-        const { error: imgError } = await supabase.storage
-          .from('pdf-products')
-          .upload(imgPath, coverImage);
-
+        const { error: imgError } = await supabase.storage.from('pdf-products').upload(imgPath, coverImage);
         if (!imgError) {
-          const { data: imgUrlData } = supabase.storage
-            .from('pdf-products')
-            .getPublicUrl(imgPath);
+          const { data: imgUrlData } = supabase.storage.from('pdf-products').getPublicUrl(imgPath);
           coverUrl = imgUrlData.publicUrl;
         }
       }
@@ -239,16 +232,11 @@ const PDFStore = () => {
         cover_image_url: coverUrl,
         status: 'pending'
       });
-
       if (error) throw error;
 
-      toast.success("PDF enviado para aprovação!");
+      toast.success("Infoproduto enviado para aprovação!");
       setShowCreateModal(false);
-      setTitle("");
-      setDescription("");
-      setPrice("");
-      setPdfFile(null);
-      setCoverImage(null);
+      setTitle(""); setDescription(""); setPrice(""); setPdfFile(null); setCoverImage(null);
       fetchProducts();
     } catch (error: any) {
       toast.error(error.message || "Erro ao criar produto");
@@ -257,87 +245,51 @@ const PDFStore = () => {
     }
   };
 
-  const handlePurchase = async (product: PDFProduct) => {
-    if (!user) {
-      toast.error("Faça login para comprar");
-      return;
-    }
-
-    // Block self-purchase
-    if (product.user_id === user.id) {
-      toast.error("Você não pode comprar seu próprio produto");
-      return;
-    }
-
-    // Already purchased, download directly
+  const handlePurchase = (product: PDFProduct) => {
+    if (!user) { toast.error("Faça login para comprar"); return; }
+    if (product.user_id === user.id) { toast.error("Você não pode comprar seu próprio produto"); return; }
     if (purchasedIds.includes(product.id)) {
-      if (product.file_url) {
-        downloadPDF(product.file_url, product.title);
-      }
+      if (product.file_url) downloadPDF(product.file_url, product.title);
       return;
     }
-
-    // Show checkout modal first
     setCheckoutProduct(product);
     setShowCheckoutModal(true);
   };
 
   const handleCheckoutSubmit = async () => {
     if (!checkoutProduct || !user) return;
-
-    if (!clientName.trim()) {
-      toast.error("Nome completo é obrigatório");
-      return;
-    }
-    if (!clientEmail.trim() || !clientEmail.includes("@")) {
-      toast.error("Email válido é obrigatório");
-      return;
-    }
-    if (!clientPhone.trim() || clientPhone.replace(/\D/g, "").length < 9) {
-      toast.error("Número de telefone válido é obrigatório");
-      return;
-    }
+    if (!clientName.trim()) { toast.error("Nome completo é obrigatório"); return; }
+    if (!clientEmail.trim() || !clientEmail.includes("@")) { toast.error("Email válido é obrigatório"); return; }
+    if (!clientPhone.trim() || clientPhone.replace(/\D/g, "").length < 9) { toast.error("Número de telefone válido é obrigatório"); return; }
 
     setShowCheckoutModal(false);
     setShowLoadingSplash(true);
 
     try {
-      
-      const phoneFormatted = clientPhone.replace(/\D/g, "");
-      
       const { data: resultData, error } = await supabase.functions.invoke('payment-webhook', {
         body: {
           action: 'purchase-pdf',
           product_id: checkoutProduct.id,
           client_name: clientName.trim(),
           client_email: clientEmail.trim(),
-          client_phone: phoneFormatted
+          client_phone: clientPhone.replace(/\D/g, "")
         }
       });
 
-      if (error) {
-        throw new Error(error.message || "Erro ao processar compra");
-      }
-
+      if (error) throw new Error(error.message || "Erro ao processar compra");
       const result = (resultData || {}) as PaymentWebhookResponse;
 
       if (result.error) {
-        if (result.already_purchased) {
-          if (checkoutProduct.file_url) {
-            downloadPDF(checkoutProduct.file_url, checkoutProduct.title);
-          }
+        if (result.already_purchased && checkoutProduct.file_url) {
+          downloadPDF(checkoutProduct.file_url, checkoutProduct.title);
           setShowLoadingSplash(false);
           return;
         }
-        throw new Error(result.error || "Erro ao processar compra");
+        throw new Error(result.error);
       }
-
-      if (!result.transaction_id || !result.reference) {
-        throw new Error("Não foi possível gerar referência de pagamento");
-      }
+      if (!result.transaction_id || !result.reference) throw new Error("Não foi possível gerar referência de pagamento");
 
       setShowLoadingSplash(false);
-
       setPendingPurchase({
         transactionId: result.transaction_id,
         productId: checkoutProduct.id,
@@ -348,10 +300,7 @@ const PDFStore = () => {
         status: "pending"
       });
       setShowPurchaseInfo(true);
-
-      // Start polling for payment status
       startPaymentPolling(result.transaction_id, checkoutProduct);
-
     } catch (error: any) {
       setShowLoadingSplash(false);
       toast.error(error.message || "Erro ao processar compra");
@@ -362,11 +311,8 @@ const PDFStore = () => {
     try {
       const response = await fetch(url);
       if (!response.ok) throw new Error("Arquivo indisponível");
-
       const blob = await response.blob();
-      const fileBlob = new Blob([blob], { type: "application/pdf" });
-      const blobUrl = URL.createObjectURL(fileBlob);
-
+      const blobUrl = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
       const link = document.createElement('a');
       link.href = blobUrl;
       link.download = `${title}.pdf`;
@@ -377,108 +323,144 @@ const PDFStore = () => {
       toast.success("Download iniciado!");
     } catch {
       window.open(url, "_blank", "noopener,noreferrer");
-      toast.success("Pagamento confirmado! Abra o PDF no link exibido.");
     }
   };
 
   const startPaymentPolling = (transactionId: string, product: PDFProduct) => {
     if (pollRef.current) clearInterval(pollRef.current);
-
     pollRef.current = setInterval(async () => {
       setCheckingPayment(true);
       try {
-        const { data: resultData, error } = await supabase.functions.invoke('payment-webhook', {
-          body: {
-            action: 'purchase-status',
-            transaction_id: transactionId,
-          }
+        const { data: resultData } = await supabase.functions.invoke('payment-webhook', {
+          body: { action: 'purchase-status', transaction_id: transactionId }
         });
-
-        if (error) throw new Error(error.message || "Erro ao verificar status");
         const result = (resultData || {}) as PaymentWebhookResponse;
-
         if (result.status === "completed") {
           if (pollRef.current) clearInterval(pollRef.current);
           setPendingPurchase(prev => prev ? { ...prev, status: "completed" } : null);
-          toast.success("Pagamento confirmado! Baixando PDF...");
-          
-          if (result.file_url) {
-            setTimeout(() => {
-              downloadPDF(result.file_url, product.title);
-            }, 1000);
-          }
-          
+          toast.success("Pagamento confirmado!");
+          if (result.file_url) setTimeout(() => downloadPDF(result.file_url!, product.title), 1000);
           fetchProducts();
         } else if (result.status === "failed") {
           if (pollRef.current) clearInterval(pollRef.current);
           setPendingPurchase(prev => prev ? { ...prev, status: "failed" } : null);
           toast.error("Pagamento expirado ou cancelado");
         }
-      } catch (error) {
-        console.error("Poll error:", error);
-      } finally {
-        setCheckingPayment(false);
-      }
+      } catch { /* retry */ } finally { setCheckingPayment(false); }
     }, 5000);
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'approved':
-        return <span className="px-2 py-0.5 rounded text-xs bg-emerald-500/20 text-emerald-600">Aprovado</span>;
-      case 'pending':
-        return <span className="px-2 py-0.5 rounded text-xs bg-amber-500/20 text-amber-600">Pendente</span>;
-      case 'rejected':
-        return <span className="px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-600">Rejeitado</span>;
-      default:
-        return null;
+      case 'approved': return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">Aprovado</span>;
+      case 'pending': return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">Em Análise</span>;
+      case 'rejected': return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20">Rejeitado</span>;
+      default: return null;
     }
   };
 
+  const totalSales = myProducts.reduce((sum, p) => sum + (p.downloads_count || 0), 0);
+  const totalRevenue = myProducts.reduce((sum, p) => sum + ((p.downloads_count || 0) * p.price * 0.85), 0);
+
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
-      <div className="px-4 pt-6 pb-4 bg-white border-b border-border">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-display text-xl font-bold text-foreground mb-1">Loja de PDFs</h1>
-            <p className="text-muted-foreground text-sm">Compre e venda conteúdo educativo</p>
+    <div className="min-h-screen bg-background pb-24">
+      {/* Hero Header */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/30" />
+        <div className="relative px-4 pt-6 pb-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="font-display text-2xl font-bold text-foreground tracking-tight">Infoprodutos</h1>
+              <p className="text-muted-foreground text-sm mt-0.5">Marketplace de e-books e conteúdos digitais</p>
+            </div>
+            {user && (
+              <Button
+                size="sm"
+                onClick={() => setShowCreateModal(true)}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 h-9 px-4"
+              >
+                <Plus size={16} className="mr-1.5" />
+                Publicar
+              </Button>
+            )}
           </div>
-          {user && (
-            <Button
-              size="sm"
-              onClick={() => setShowCreateModal(true)}
-              className="bg-primary hover:bg-primary/90 text-white shadow-md"
+
+          {/* Stats Bar */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-card border border-border rounded-xl p-3 text-center">
+              <BookOpen size={18} className="mx-auto text-primary mb-1" />
+              <p className="text-lg font-bold text-foreground">{products.length}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Produtos</p>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-3 text-center">
+              <TrendingUp size={18} className="mx-auto text-emerald-500 mb-1" />
+              <p className="text-lg font-bold text-foreground">{totalSales}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Vendas</p>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-3 text-center">
+              <Star size={18} className="mx-auto text-amber-500 mb-1" />
+              <p className="text-lg font-bold text-foreground">{myProducts.length}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Meus</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Search & Filter */}
+      <div className="px-4 py-3 space-y-2">
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar infoprodutos..."
+            className="pl-9 bg-card border-border h-10"
+          />
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
+          {([
+            { key: 'recent', label: 'Recentes' },
+            { key: 'popular', label: 'Populares' },
+            { key: 'price_low', label: 'Menor Preço' },
+            { key: 'price_high', label: 'Maior Preço' },
+          ] as const).map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => setSortBy(opt.key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                sortBy === opt.key
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-muted-foreground hover:text-foreground'
+              }`}
             >
-              <Plus size={16} className="mr-1" />
-              Publicar
-            </Button>
-          )}
+              {opt.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Tab Navigation */}
-      <div className="px-4 py-4">
+      <div className="px-4 mb-3">
         <div className="flex bg-secondary rounded-xl p-1 border border-border">
           <button
             onClick={() => setActiveTab('loja')}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'loja' 
-                ? 'bg-primary text-white' 
+                ? 'bg-primary text-primary-foreground shadow-sm' 
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Loja
+            Catálogo
           </button>
           <button
             onClick={() => setActiveTab('meus')}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'meus' 
-                ? 'bg-primary text-white' 
+                ? 'bg-primary text-primary-foreground shadow-sm' 
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Meus PDFs
+            Meus Infoprodutos
           </button>
         </div>
       </div>
@@ -487,85 +469,123 @@ const PDFStore = () => {
         {activeTab === 'loja' ? (
           <div className="space-y-3">
             {loading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="h-24 bg-secondary rounded-xl animate-pulse" />
+              <div className="grid grid-cols-2 gap-3">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="aspect-[3/4] bg-secondary rounded-2xl animate-pulse" />
                 ))}
               </div>
-            ) : products.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <FileText size={40} className="mx-auto mb-3 opacity-50" />
-                <p className="font-medium">Nenhum produto disponível</p>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                  <BookOpen size={28} className="text-muted-foreground" />
+                </div>
+                <p className="font-semibold text-foreground mb-1">Nenhum infoproduto encontrado</p>
+                <p className="text-sm text-muted-foreground">
+                  {searchQuery ? "Tente outra pesquisa" : "Seja o primeiro a publicar!"}
+                </p>
               </div>
             ) : (
-              products.map((product, index) => {
-                const isOwner = user && product.user_id === user.id;
-                return (
-                  <motion.div
-                    key={product.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="bg-white border border-border rounded-xl p-4 shadow-sm"
-                  >
-                    <div className="flex gap-4">
-                      <div className="w-16 h-20 rounded-lg flex-shrink-0 overflow-hidden bg-primary/10">
+              <div className="grid grid-cols-2 gap-3">
+                {filteredProducts.map((product, index) => {
+                  const isOwner = user && product.user_id === user.id;
+                  const isPurchased = purchasedIds.includes(product.id);
+                  return (
+                    <motion.div
+                      key={product.id}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.04 }}
+                      className="group bg-card border border-border rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-primary/30 transition-all"
+                    >
+                      {/* Cover */}
+                      <div className="aspect-[4/3] relative overflow-hidden bg-gradient-to-br from-primary/10 to-accent/30">
                         {product.cover_image_url ? (
-                          <img src={product.cover_image_url} alt={product.title} className="w-full h-full object-cover" />
+                          <img 
+                            src={product.cover_image_url} 
+                            alt={product.title} 
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <FileText className="text-primary" size={24} />
+                            <FileText className="text-primary/40" size={40} />
+                          </div>
+                        )}
+                        {/* Price Badge */}
+                        <div className="absolute top-2 right-2 bg-foreground/80 backdrop-blur-sm text-background text-xs font-bold px-2.5 py-1 rounded-full">
+                          {product.price.toLocaleString('pt-AO')} Kz
+                        </div>
+                        {isPurchased && (
+                          <div className="absolute top-2 left-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <CheckCircle size={10} /> Comprado
                           </div>
                         )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground text-sm truncate">{product.title}</h3>
+
+                      {/* Info */}
+                      <div className="p-3">
+                        <h3 className="font-semibold text-foreground text-sm leading-tight line-clamp-2 mb-1">
+                          {product.title}
+                        </h3>
                         {product.description && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{product.description}</p>
+                          <p className="text-[11px] text-muted-foreground line-clamp-2 mb-2">
+                            {product.description}
+                          </p>
                         )}
-                        <div className="flex items-center gap-2 mt-2">
-                          <Download size={12} className="text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">{product.downloads_count || 0} downloads</span>
+                        <div className="flex items-center gap-1.5 text-muted-foreground mb-2.5">
+                          <Download size={11} />
+                          <span className="text-[11px]">{product.downloads_count || 0} vendas</span>
                         </div>
-                      </div>
-                      <div className="text-right flex flex-col items-end justify-between">
-                        <span className="font-bold text-primary">
-                          {product.price.toLocaleString('pt-AO')} AOA
-                        </span>
+                        
                         {isOwner ? (
-                          <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded">Seu produto</span>
+                          <div className="text-[11px] text-center text-muted-foreground bg-secondary py-1.5 rounded-lg">
+                            Seu infoproduto
+                          </div>
                         ) : (
                           <Button
                             size="sm"
                             onClick={() => handlePurchase(product)}
-                            className="bg-primary hover:bg-primary/90 text-white text-xs h-8 shadow-md"
+                            className={`w-full text-xs h-8 shadow-sm ${
+                              isPurchased 
+                                ? 'bg-emerald-500 hover:bg-emerald-600 text-white' 
+                                : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                            }`}
                           >
-                            {purchasedIds.includes(product.id) ? (
-                              <>
-                                <Download size={14} className="mr-1" />
-                                Baixar
-                              </>
+                            {isPurchased ? (
+                              <><Download size={13} className="mr-1" /> Baixar PDF</>
                             ) : (
-                              <>
-                                <ShoppingCart size={14} className="mr-1" />
-                                Comprar
-                              </>
+                              <><ShoppingCart size={13} className="mr-1" /> Comprar</>
                             )}
                           </Button>
                         )}
                       </div>
-                    </div>
-                  </motion.div>
-                );
-              })
+                    </motion.div>
+                  );
+                })}
+              </div>
             )}
           </div>
         ) : (
+          /* Meus Infoprodutos */
           <div className="space-y-3">
+            {/* Revenue Card */}
+            {myProducts.length > 0 && (
+              <div className="bg-gradient-to-r from-primary to-orange-600 rounded-2xl p-4 text-white">
+                <p className="text-white/70 text-xs uppercase tracking-wider mb-1">Receita Total (85%)</p>
+                <p className="text-2xl font-bold font-mono">{totalRevenue.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} AOA</p>
+                <p className="text-white/60 text-xs mt-1">{totalSales} vendas realizadas</p>
+              </div>
+            )}
+
             {myProducts.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <FileText size={40} className="mx-auto mb-3 opacity-50" />
-                <p className="font-medium">Você ainda não publicou nenhum PDF</p>
+              <div className="text-center py-16">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                  <Plus size={28} className="text-muted-foreground" />
+                </div>
+                <p className="font-semibold text-foreground mb-1">Publique seu primeiro infoproduto</p>
+                <p className="text-sm text-muted-foreground mb-4">Venda e-books e conteúdos digitais</p>
+                <Button onClick={() => setShowCreateModal(true)} className="bg-primary text-primary-foreground">
+                  <Plus size={16} className="mr-1.5" /> Publicar Agora
+                </Button>
               </div>
             ) : (
               myProducts.map((product, index) => (
@@ -574,19 +594,33 @@ const PDFStore = () => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className="bg-white border border-border rounded-xl p-4 shadow-sm"
+                  className="bg-card border border-border rounded-2xl p-4 shadow-sm"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold text-foreground text-sm">{product.title}</h3>
-                    {getStatusBadge(product.status)}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground text-sm">
-                      {product.price.toLocaleString('pt-AO')} AOA
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {product.downloads_count || 0} vendas
-                    </span>
+                  <div className="flex gap-3">
+                    <div className="w-14 h-18 rounded-xl flex-shrink-0 overflow-hidden bg-primary/10">
+                      {product.cover_image_url ? (
+                        <img src={product.cover_image_url} alt={product.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <FileText className="text-primary/50" size={20} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-foreground text-sm truncate">{product.title}</h3>
+                        {getStatusBadge(product.status)}
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="font-bold text-primary text-sm">
+                          {product.price.toLocaleString('pt-AO')} AOA
+                        </span>
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Eye size={12} />
+                          <span className="text-xs">{product.downloads_count || 0} vendas</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </motion.div>
               ))
@@ -604,7 +638,7 @@ const PDFStore = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end justify-center p-4"
+            className="fixed inset-0 bg-foreground/50 backdrop-blur-sm z-50 flex items-end justify-center p-4"
             onClick={() => setShowCheckoutModal(false)}
           >
             <motion.div
@@ -612,55 +646,61 @@ const PDFStore = () => {
               animate={{ y: 0 }}
               exit={{ y: 100 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white border border-border rounded-2xl w-full max-w-md p-6 shadow-xl max-h-[85vh] overflow-y-auto"
+              className="bg-card border border-border rounded-2xl w-full max-w-md p-6 shadow-2xl max-h-[85vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-lg text-foreground">Checkout</h3>
-                <button onClick={() => setShowCheckoutModal(false)} className="text-muted-foreground hover:text-foreground">
+                <h3 className="font-display font-bold text-lg text-foreground">Checkout Seguro</h3>
+                <button onClick={() => setShowCheckoutModal(false)} className="text-muted-foreground hover:text-foreground p-1">
                   <X size={20} />
                 </button>
               </div>
 
-              <div className="bg-secondary rounded-xl p-3 mb-4">
-                <p className="text-sm font-semibold text-foreground">{checkoutProduct.title}</p>
-                <p className="text-lg font-bold text-primary">{checkoutProduct.price.toLocaleString('pt-AO')} AOA</p>
+              <div className="bg-secondary rounded-xl p-3 mb-4 flex gap-3 items-center">
+                <div className="w-12 h-14 rounded-lg overflow-hidden bg-primary/10 flex-shrink-0">
+                  {checkoutProduct.cover_image_url ? (
+                    <img src={checkoutProduct.cover_image_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center"><FileText className="text-primary/40" size={18} /></div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground line-clamp-1">{checkoutProduct.title}</p>
+                  <p className="text-lg font-bold text-primary">{checkoutProduct.price.toLocaleString('pt-AO')} AOA</p>
+                </div>
               </div>
 
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 mb-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <Shield size={16} className="text-primary" />
-                  <span className="font-semibold text-foreground text-sm">Checkout Seguro</span>
-                </div>
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 mb-4 flex items-start gap-2">
+                <Shield size={16} className="text-primary flex-shrink-0 mt-0.5" />
                 <p className="text-muted-foreground text-xs">
-                  Preencha seus dados para gerar a referência de pagamento.
+                  Pagamento por referência PlinqPay (Entidade {ENTITY_CODE}). Após pagamento, o download é liberado automaticamente.
                 </p>
               </div>
 
               <div className="space-y-3">
                 <div>
                   <Label className="text-sm text-muted-foreground flex items-center gap-1.5 mb-1.5">
-                    <User size={14} /> Nome Completo *
+                    <User size={14} /> Nome Completo
                   </Label>
-                  <Input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Seu nome completo" className="bg-secondary border-border text-foreground" />
+                  <Input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Seu nome completo" className="bg-secondary border-border" />
                 </div>
                 <div>
                   <Label className="text-sm text-muted-foreground flex items-center gap-1.5 mb-1.5">
-                    <Mail size={14} /> Email *
+                    <Mail size={14} /> Email
                   </Label>
-                  <Input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="seu@email.com" className="bg-secondary border-border text-foreground" />
+                  <Input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="seu@email.com" className="bg-secondary border-border" />
                 </div>
                 <div>
                   <Label className="text-sm text-muted-foreground flex items-center gap-1.5 mb-1.5">
-                    <Phone size={14} /> Número de Telefone *
+                    <Phone size={14} /> Telefone
                   </Label>
-                  <Input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="923456789" className="bg-secondary border-border text-foreground" />
+                  <Input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="923456789" className="bg-secondary border-border" />
                 </div>
               </div>
 
               <Button
                 onClick={handleCheckoutSubmit}
                 disabled={!clientName || !clientEmail || !clientPhone}
-                className="w-full h-11 bg-primary hover:bg-primary/90 text-white font-semibold shadow-md mt-4"
+                className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 mt-4"
               >
                 <CreditCard size={16} className="mr-2" />
                 Gerar Referência de Pagamento
@@ -685,7 +725,7 @@ const PDFStore = () => {
               className="w-16 h-16 rounded-full border-4 border-muted border-t-primary mb-6"
             />
             <p className="text-foreground font-semibold text-lg">Gerando referência...</p>
-            <p className="text-muted-foreground text-sm mt-2">Aguarde um momento...</p>
+            <p className="text-muted-foreground text-sm mt-2">Aguarde um momento</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -697,7 +737,7 @@ const PDFStore = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end justify-center p-4"
+            className="fixed inset-0 bg-foreground/50 backdrop-blur-sm z-50 flex items-end justify-center p-4"
             onClick={() => setShowCreateModal(false)}
           >
             <motion.div
@@ -705,51 +745,51 @@ const PDFStore = () => {
               animate={{ y: 0 }}
               exit={{ y: 100 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white border border-border rounded-2xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto shadow-xl"
+              className="bg-card border border-border rounded-2xl w-full max-w-md p-6 max-h-[85vh] overflow-y-auto shadow-2xl"
             >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-lg text-foreground">Publicar PDF</h3>
-                <button onClick={() => setShowCreateModal(false)} className="text-muted-foreground hover:text-foreground">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-display font-bold text-lg text-foreground">Publicar Infoproduto</h3>
+                <button onClick={() => setShowCreateModal(false)} className="text-muted-foreground hover:text-foreground p-1">
                   <X size={20} />
                 </button>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm text-muted-foreground block mb-1.5">Título *</label>
-                  <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Nome do seu PDF" className="bg-secondary border-border text-foreground" />
+                  <Label className="text-sm text-muted-foreground block mb-1.5">Título do Infoproduto *</Label>
+                  <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Guia Completo de Marketing Digital" className="bg-secondary border-border" />
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground block mb-1.5">Descrição</label>
-                  <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descreva o conteúdo..." className="bg-secondary border-border text-foreground resize-none" rows={3} />
+                  <Label className="text-sm text-muted-foreground block mb-1.5">Descrição</Label>
+                  <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descreva o conteúdo do seu infoproduto..." className="bg-secondary border-border resize-none" rows={3} />
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground block mb-1.5">Preço (AOA) *</label>
-                  <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Ex: 500" className="bg-secondary border-border text-foreground" />
+                  <Label className="text-sm text-muted-foreground block mb-1.5">Preço (AOA) *</Label>
+                  <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Ex: 1500" className="bg-secondary border-border" />
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground block mb-1.5">Imagem de Capa</label>
-                  <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/50 transition-colors">
+                  <Label className="text-sm text-muted-foreground block mb-1.5">Capa do Infoproduto</Label>
+                  <label className="flex items-center justify-center gap-2 p-5 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/50 transition-colors bg-secondary/50">
                     <ImageIcon size={20} className="text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">{coverImage ? coverImage.name : 'Selecionar imagem'}</span>
+                    <span className="text-sm text-muted-foreground">{coverImage ? coverImage.name : 'Selecionar imagem de capa'}</span>
                     <input type="file" accept="image/*" onChange={(e) => setCoverImage(e.target.files?.[0] || null)} className="hidden" />
                   </label>
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground block mb-1.5">Arquivo PDF *</label>
-                  <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/50 transition-colors">
+                  <Label className="text-sm text-muted-foreground block mb-1.5">Arquivo PDF *</Label>
+                  <label className="flex items-center justify-center gap-2 p-5 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/50 transition-colors bg-secondary/50">
                     <Upload size={20} className="text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">{pdfFile ? pdfFile.name : 'Selecionar arquivo'}</span>
+                    <span className="text-sm text-muted-foreground">{pdfFile ? pdfFile.name : 'Selecionar arquivo PDF'}</span>
                     <input type="file" accept=".pdf" onChange={(e) => setPdfFile(e.target.files?.[0] || null)} className="hidden" />
                   </label>
                 </div>
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                  <p className="text-amber-700 text-xs flex items-center gap-1">
-                    <AlertTriangle size={14} />
-                    Seu PDF será enviado para aprovação. 15% do valor de cada venda é retido como taxa.
+                <div className="bg-accent border border-primary/10 rounded-xl p-3">
+                  <p className="text-accent-foreground text-xs flex items-start gap-1.5">
+                    <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+                    <span>Seu infoproduto será analisado antes de ser publicado. Taxa de 15% por venda.</span>
                   </p>
                 </div>
-                <Button onClick={handleCreateProduct} disabled={uploading || !title || !price || !pdfFile} className="w-full h-11 bg-primary hover:bg-primary/90 text-white font-semibold shadow-md">
+                <Button onClick={handleCreateProduct} disabled={uploading || !title || !price || !pdfFile} className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20">
                   {uploading ? 'Enviando...' : 'Enviar para Aprovação'}
                 </Button>
               </div>
@@ -758,25 +798,25 @@ const PDFStore = () => {
         )}
       </AnimatePresence>
 
-      {/* Purchase Reference Modal - shows entity + reference directly */}
+      {/* Purchase Reference Modal */}
       <AnimatePresence>
         {showPurchaseInfo && pendingPurchase && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-foreground/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white border border-border rounded-2xl w-full max-w-md p-6 shadow-xl"
+              className="bg-card border border-border rounded-2xl w-full max-w-md p-6 shadow-2xl"
             >
               <div className="flex items-center justify-between mb-5">
-                <h3 className="font-bold text-lg text-foreground">
-                  {pendingPurchase.status === "completed" ? "Pago!" : 
-                   pendingPurchase.status === "failed" ? "Não Pago" : "Aguardando Pagamento"}
+                <h3 className="font-display font-bold text-lg text-foreground">
+                  {pendingPurchase.status === "completed" ? "Pagamento Confirmado" : 
+                   pendingPurchase.status === "failed" ? "Pagamento Falhou" : "Aguardando Pagamento"}
                 </h3>
                 <button 
                   onClick={() => {
@@ -784,7 +824,7 @@ const PDFStore = () => {
                     setPendingPurchase(null);
                     if (pollRef.current) clearInterval(pollRef.current);
                   }}
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground p-1"
                 >
                   <X size={20} />
                 </button>
@@ -793,32 +833,34 @@ const PDFStore = () => {
               <div className="text-center space-y-4">
                 {pendingPurchase.status === "pending" && (
                   <>
-                    <div className="w-16 h-16 mx-auto rounded-full bg-amber-100 flex items-center justify-center">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/10 flex items-center justify-center">
                       <Clock size={28} className="text-amber-600" />
                     </div>
                     
-                    <div className="text-left">
-                      <p className="text-sm text-muted-foreground mb-2">Produto: <strong className="text-foreground">{pendingPurchase.productTitle}</strong></p>
+                    <p className="text-sm text-muted-foreground">
+                      Produto: <strong className="text-foreground">{pendingPurchase.productTitle}</strong>
+                    </p>
+
+                    <div className="bg-secondary rounded-2xl p-5 text-left space-y-4">
+                      <div>
+                        <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Entidade</span>
+                        <p className="font-mono font-bold text-foreground text-2xl">{pendingPurchase.entity}</p>
+                      </div>
+                      <div className="border-t border-border" />
+                      <div>
+                        <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Referência</span>
+                        <p className="font-mono font-bold text-foreground text-xl">{pendingPurchase.reference}</p>
+                      </div>
+                      <div className="border-t border-border" />
+                      <div>
+                        <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Valor</span>
+                        <p className="font-mono font-bold text-primary text-2xl">{pendingPurchase.amount.toLocaleString('pt-AO')} AOA</p>
+                      </div>
                     </div>
 
-                    <div className="bg-secondary rounded-xl p-4 text-left space-y-3">
-                      <div>
-                        <span className="text-xs text-muted-foreground">Entidade</span>
-                        <p className="font-mono font-bold text-foreground text-lg">{pendingPurchase.entity}</p>
-                      </div>
-                      <div>
-                        <span className="text-xs text-muted-foreground">Referência</span>
-                        <p className="font-mono font-bold text-foreground text-lg">{pendingPurchase.reference}</p>
-                      </div>
-                      <div>
-                        <span className="text-xs text-muted-foreground">Valor</span>
-                        <p className="font-mono font-bold text-primary text-lg">{pendingPurchase.amount.toLocaleString('pt-AO')} AOA</p>
-                      </div>
-                    </div>
-
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                      <p className="text-amber-700 text-xs">
-                        {checkingPayment ? "⏳ Verificando pagamento..." : "⏳ Pague por referência PlinqPay. A aprovação será confirmada automaticamente."}
+                    <div className="bg-accent border border-primary/10 rounded-xl p-3">
+                      <p className="text-accent-foreground text-xs">
+                        {checkingPayment ? "Verificando pagamento..." : "Pague por referência no seu banco ou app de pagamento. A confirmação é automática."}
                       </p>
                     </div>
 
@@ -828,47 +870,33 @@ const PDFStore = () => {
                         toast.success("Dados copiados!");
                       }}
                       variant="outline"
-                      className="w-full"
+                      className="w-full border-border"
                     >
-                      Copiar Dados
+                      <Copy size={16} className="mr-2" />
+                      Copiar Dados de Pagamento
                     </Button>
                   </>
                 )}
 
                 {pendingPurchase.status === "completed" && (
                   <>
-                    <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 flex items-center justify-center">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/10 flex items-center justify-center">
                       <CheckCircle size={28} className="text-emerald-600" />
                     </div>
-                    <div>
-                      <h4 className="font-bold text-foreground">Pagamento Confirmado!</h4>
-                      <p className="text-sm text-muted-foreground">Seu PDF está sendo baixado automaticamente</p>
-                    </div>
+                    <h4 className="font-bold text-foreground text-lg">Pagamento Confirmado!</h4>
+                    <p className="text-sm text-muted-foreground">Seu PDF está sendo baixado automaticamente</p>
                   </>
                 )}
 
                 {pendingPurchase.status === "failed" && (
                   <>
-                    <div className="w-16 h-16 mx-auto rounded-full bg-red-100 flex items-center justify-center">
-                      <XCircle size={28} className="text-red-600" />
+                    <div className="w-16 h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
+                      <XCircle size={28} className="text-destructive" />
                     </div>
-                    <div>
-                      <h4 className="font-bold text-foreground">Pagamento Expirado</h4>
-                      <p className="text-sm text-muted-foreground">O pagamento expirou ou foi cancelado</p>
-                    </div>
+                    <h4 className="font-bold text-foreground text-lg">Pagamento Expirado</h4>
+                    <p className="text-sm text-muted-foreground">A referência expirou ou foi cancelada. Tente novamente.</p>
                   </>
                 )}
-
-                <Button
-                  onClick={() => {
-                    setShowPurchaseInfo(false);
-                    setPendingPurchase(null);
-                    if (pollRef.current) clearInterval(pollRef.current);
-                  }}
-                  className="w-full bg-primary hover:bg-primary/90 text-white"
-                >
-                  Fechar
-                </Button>
               </div>
             </motion.div>
           </motion.div>
