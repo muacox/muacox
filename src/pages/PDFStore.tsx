@@ -572,10 +572,10 @@ const PDFStore = () => {
           <div className="space-y-3">
             {/* Revenue Card */}
             {myProducts.length > 0 && (
-              <div className="bg-gradient-to-r from-primary to-orange-600 rounded-2xl p-4 text-white">
-                <p className="text-white/70 text-xs uppercase tracking-wider mb-1">Receita Total (85%)</p>
+              <div className="brand-gradient rounded-2xl p-4 text-primary-foreground shadow-lg">
+                <p className="text-primary-foreground/70 text-xs uppercase tracking-wider mb-1">Receita Total (85%)</p>
                 <p className="text-2xl font-bold font-mono">{totalRevenue.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} AOA</p>
-                <p className="text-white/60 text-xs mt-1">{totalSales} vendas realizadas</p>
+                <p className="text-primary-foreground/70 text-xs mt-1">{totalSales} vendas realizadas</p>
               </div>
             )}
 
