@@ -140,8 +140,8 @@ async function fetchPlinqPayTransactionDetails(transactionId: string, apiKey: st
 
 // Create PlinqPay reference - follows official docs exactly
 // Docs: POST https://api.plinqpay.com/v1/transaction
-// Header: api-key: PUBLIC_KEY
-// Body: { externalId, callbackUrl, method: "REFERENCE", client: {name, email, phone}, items: [{title, price, quantity}], amount: 1 }
+// Header: api-key: PUBLIC_KEY / SECRET_KEY
+// Body: { externalId, callbackUrl, method: "REFERENCE", client, items, amount }
 async function createPlinqPayReference(payload: {
   externalId: string;
   title: string;
@@ -150,8 +150,9 @@ async function createPlinqPayReference(payload: {
   clientEmail: string;
   clientPhone: string;
 }) {
-  if (!PLINQPAY_PUBLIC_KEY) {
-    return { ok: false, status: 500, result: { message: "PlinqPay public key não configurada" } };
+  const apiKeys = uniquePlinqPayKeys();
+  if (!apiKeys.length) {
+    return { ok: false, status: 500, result: { message: "Chaves da PlinqPay não configuradas" } };
   }
 
   const body = {
@@ -173,33 +174,78 @@ async function createPlinqPayReference(payload: {
     amount: 1,
   };
 
-  console.log("PlinqPay request:", JSON.stringify(body));
+  console.log("PlinqPay request body:", JSON.stringify(body));
 
-  try {
-    const response = await fetch(PLINQPAY_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "api-key": PLINQPAY_PUBLIC_KEY,
-      },
-      body: JSON.stringify(body),
-    });
+  const attempts: Array<{ keyIndex: number; status: number; result: any }> = [];
 
-    const raw = await response.text();
-    console.log("PlinqPay raw response:", raw, "status:", response.status);
+  for (let index = 0; index < apiKeys.length; index++) {
+    const apiKey = apiKeys[index];
 
-    let result: any;
     try {
-      result = raw ? JSON.parse(raw) : {};
-    } catch {
-      result = { message: raw || "Resposta inválida da PlinqPay" };
-    }
+      const response = await fetch(PLINQPAY_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": apiKey,
+        },
+        body: JSON.stringify(body),
+      });
 
-    return { ok: response.ok, status: response.status, result };
-  } catch (err) {
-    console.error("PlinqPay fetch error:", err);
-    return { ok: false, status: 500, result: { message: "Erro de conexão com PlinqPay: " + String(err) } };
+      const raw = await response.text();
+      const result = safeJsonParse(raw);
+      const parsed = extractReferenceFromResult(result, response.headers);
+
+      attempts.push({ keyIndex: index + 1, status: response.status, result });
+
+      console.log(`PlinqPay attempt #${index + 1} status:`, response.status, "result:", JSON.stringify(result));
+
+      if (response.ok && parsed.reference) {
+        return {
+          ok: true,
+          status: response.status,
+          result: {
+            ...result,
+            reference: parsed.reference,
+            entity: parsed.entity,
+            id: parsed.plinqpayId || extractField(result, "id"),
+          },
+        };
+      }
+
+      const createdTransactionId = parsed.plinqpayId || extractField(result, "id", "transaction_id", "transactionId");
+      if (response.ok && createdTransactionId) {
+        const lookup = await fetchPlinqPayTransactionDetails(createdTransactionId, apiKey);
+        if (lookup.ok && lookup.parsed.reference) {
+          return {
+            ok: true,
+            status: lookup.status,
+            result: {
+              ...lookup.result,
+              reference: lookup.parsed.reference,
+              entity: lookup.parsed.entity,
+              id: lookup.parsed.plinqpayId || createdTransactionId,
+            },
+          };
+        }
+      }
+    } catch (error) {
+      attempts.push({
+        keyIndex: index + 1,
+        status: 500,
+        result: { message: `Erro de conexão: ${String(error)}` },
+      });
+      console.error(`PlinqPay attempt #${index + 1} failed:`, error);
+    }
   }
+
+  return {
+    ok: false,
+    status: 400,
+    result: {
+      message: "Não foi possível gerar referência PlinqPay",
+      attempts,
+    },
+  };
 }
 
 // Route handler
