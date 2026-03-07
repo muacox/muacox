@@ -365,19 +365,22 @@ const PDFStore = () => {
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Hero Header */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/30" />
-        <div className="relative px-4 pt-6 pb-5">
+      <div className="relative overflow-hidden px-4 pt-6 pb-5">
+        <div className="absolute inset-0 brand-gradient opacity-10" />
+        <div className="absolute -top-20 -right-14 h-44 w-44 rounded-full bg-primary/20 blur-3xl" />
+        <div className="absolute -bottom-20 -left-16 h-44 w-44 rounded-full bg-accent blur-3xl" />
+
+        <div className="relative">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="font-display text-2xl font-bold text-foreground tracking-tight">Infoprodutos</h1>
-              <p className="text-muted-foreground text-sm mt-0.5">Marketplace de e-books e conteúdos digitais</p>
+              <h1 className="font-display text-2xl font-bold text-foreground tracking-tight">Catálogo de Infoprodutores</h1>
+              <p className="text-muted-foreground text-sm mt-0.5">Venda e-books, guias e conteúdos digitais com checkout automático</p>
             </div>
             {user && (
               <Button
                 size="sm"
                 onClick={() => setShowCreateModal(true)}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 h-9 px-4"
+                className="h-9 px-4"
               >
                 <Plus size={16} className="mr-1.5" />
                 Publicar
@@ -387,18 +390,18 @@ const PDFStore = () => {
 
           {/* Stats Bar */}
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-card border border-border rounded-xl p-3 text-center">
+            <div className="glass-card border border-border rounded-xl p-3 text-center">
               <BookOpen size={18} className="mx-auto text-primary mb-1" />
               <p className="text-lg font-bold text-foreground">{products.length}</p>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Produtos</p>
             </div>
-            <div className="bg-card border border-border rounded-xl p-3 text-center">
-              <TrendingUp size={18} className="mx-auto text-emerald-500 mb-1" />
+            <div className="glass-card border border-border rounded-xl p-3 text-center">
+              <TrendingUp size={18} className="mx-auto text-success mb-1" />
               <p className="text-lg font-bold text-foreground">{totalSales}</p>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Vendas</p>
             </div>
-            <div className="bg-card border border-border rounded-xl p-3 text-center">
-              <Star size={18} className="mx-auto text-amber-500 mb-1" />
+            <div className="glass-card border border-border rounded-xl p-3 text-center">
+              <Star size={18} className="mx-auto text-warning mb-1" />
               <p className="text-lg font-bold text-foreground">{myProducts.length}</p>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Meus</p>
             </div>
