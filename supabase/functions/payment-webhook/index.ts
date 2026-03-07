@@ -75,8 +75,13 @@ function extractField(obj: any, ...keys: string[]): string {
   return "";
 }
 
+function isLikelyPlinqPayKey(value: string) {
+  const normalized = value.trim();
+  return normalized.length >= 20 && !normalized.startsWith("http://") && !normalized.startsWith("https://");
+}
+
 function uniquePlinqPayKeys(): string[] {
-  return Array.from(new Set([PLINQPAY_SECRET_KEY, PLINQPAY_PUBLIC_KEY, PLINQPAY_API_KEY].filter(Boolean)));
+  return Array.from(new Set([PLINQPAY_SECRET_KEY, PLINQPAY_PUBLIC_KEY, PLINQPAY_API_KEY].filter(isLikelyPlinqPayKey)));
 }
 
 function safeJsonParse(raw: string): any {
