@@ -12,9 +12,10 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // PlinqPay config - docs: https://plinqpay.com/docs
 const PLINQPAY_API_URL = "https://api.plinqpay.com/v1/transaction";
 const PLINQPAY_PUBLIC_KEY = Deno.env.get("PLINQPAY_PUBLIC_KEY") || "";
-const PLINQPAY_SECRET_KEY = Deno.env.get("PLINQPAY_SECRET_KEY") || Deno.env.get("PLINQPAY_API_KEY") || "";
+const PLINQPAY_SECRET_KEY = Deno.env.get("PLINQPAY_SECRET_KEY") || "";
+const PLINQPAY_API_KEY = Deno.env.get("PLINQPAY_API_KEY") || "";
 const ENTITY_CODE = "01055";
-const WEBHOOK_SECRET = Deno.env.get("PLINQPAY_SECRET_KEY") || "";
+const WEBHOOK_SECRET = Deno.env.get("PAYMENT_WEBHOOK_SECRET") || PLINQPAY_SECRET_KEY || "";
 
 const getCallbackUrl = () => `${supabaseUrl}/functions/v1/payment-webhook/plinqpay-callback`;
 
