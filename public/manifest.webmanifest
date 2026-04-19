@@ -1,0 +1,13 @@
+{
+  "name": "MuacoX — Criamos história que inovam",
+  "short_name": "MuacoX",
+  "description": "Sites, hospedagem e flyers profissionais em Angola.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0033FF",
+  "icons": [
+    { "src": "/favicon.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/favicon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
