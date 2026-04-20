@@ -67,7 +67,7 @@ const Index = () => {
       >
         <div className="container mx-auto px-4 h-16 md:h-20 flex items-center justify-between gap-3">
           <Link to="/" className="flex items-center gap-2 shrink-0">
-            <img src={logo} alt="MuacoX" className="h-10 md:h-14 w-auto" />
+            <img src={logo} alt="MuacoX" className="h-14 md:h-20 w-auto drop-shadow-md" />
           </Link>
           <div className="hidden md:flex items-center gap-8 text-sm font-semibold">
             <a href="#planos" className="hover:text-primary transition">Planos</a>
@@ -280,7 +280,7 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <img src={logo} alt="MuacoX" className="h-10 brightness-0 invert" />
+              <img src={logo} alt="MuacoX" className="h-16 md:h-20 brightness-0 invert" />
             </div>
             <p className="text-white/60 text-sm text-center">{SITE.copyright}</p>
             <p className="text-white/40 text-xs">Criado por {SITE.founder}</p>

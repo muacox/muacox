@@ -21,7 +21,7 @@ export const AuthLayout = ({ children, title, subtitle }: Props) => (
       <Link to="/" className="text-white/90 hover:text-white flex items-center gap-2 text-sm font-semibold">
         <ArrowLeft className="h-4 w-4" /> Voltar
       </Link>
-      <img src={logo} alt="MuacoX" className="h-10 brightness-0 invert" />
+      <img src={logo} alt="MuacoX" className="h-16 md:h-20 brightness-0 invert drop-shadow-lg" />
     </div>
 
     {/* Hero */}
