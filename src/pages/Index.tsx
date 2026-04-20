@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
-import { ArrowRight, Sparkles, Globe, Server, Image as ImageIcon, Mail, Phone, Check } from "lucide-react";
+import { motion, useScroll, useMotionValueEvent } from "framer-motion";
+import { ArrowRight, Sparkles, Globe, Server, Image as ImageIcon, Mail, Phone, Check, LayoutDashboard, LogIn, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { SITE, formatKz } from "@/lib/site";
 import logo from "@/assets/muacox-logo.png";
 import flyer1 from "@/assets/flyers/flyer-marketing.png";
@@ -33,6 +34,16 @@ const flyers = [
 
 const Index = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [hidden, setHidden] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const { scrollY } = useScroll();
+  const { user } = useAuth();
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    const prev = scrollY.getPrevious() ?? 0;
+    if (latest > prev && latest > 120) setHidden(true);
+    else setHidden(false);
+  });
 
   useEffect(() => {
     supabase.from("service_plans").select("*").eq("active", true).order("display_order").then(({ data }) => {
@@ -49,10 +60,14 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* NAV */}
-      <nav className="fixed top-0 inset-x-0 z-50 liquid-glass">
-        <div className="container mx-auto px-4 h-20 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={logo} alt="MuacoX" className="h-12 md:h-14 w-auto" />
+      <motion.nav
+        animate={{ y: hidden ? -100 : 0 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+        className="fixed top-0 inset-x-0 z-50 liquid-glass"
+      >
+        <div className="container mx-auto px-4 h-16 md:h-20 flex items-center justify-between gap-3">
+          <Link to="/" className="flex items-center gap-2 shrink-0">
+            <img src={logo} alt="MuacoX" className="h-10 md:h-14 w-auto" />
           </Link>
           <div className="hidden md:flex items-center gap-8 text-sm font-semibold">
             <a href="#planos" className="hover:text-primary transition">Planos</a>
@@ -60,40 +75,84 @@ const Index = () => {
             <a href="#sobre" className="hover:text-primary transition">Sobre</a>
             <a href="#contacto" className="hover:text-primary transition">Contacto</a>
           </div>
-          <a href={SITE.whatsapp} target="_blank" rel="noopener">
-            <Button className="rounded-full bg-gradient-blue text-white shadow-medium hover:shadow-glow">
-              Pedir Orçamento <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </a>
+          <div className="flex items-center gap-2">
+            {user ? (
+              <Link to="/dashboard">
+                <Button size="sm" className="rounded-full bg-gradient-blue text-white shadow-medium">
+                  <LayoutDashboard className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Painel</span>
+                </Button>
+              </Link>
+            ) : (
+              <Link to="/login" className="hidden sm:block">
+                <Button size="sm" variant="ghost" className="rounded-full font-semibold">
+                  <LogIn className="h-4 w-4 mr-1" />Entrar
+                </Button>
+              </Link>
+            )}
+            <a href={SITE.whatsapp} target="_blank" rel="noopener" className="hidden sm:block">
+              <Button size="sm" className="rounded-full bg-gradient-blue text-white shadow-medium hover:shadow-glow">
+                Orçamento <ArrowRight className="ml-1 h-3 w-3" />
+              </Button>
+            </a>
+            <button onClick={() => setMobileOpen(v => !v)} className="md:hidden p-2 rounded-full hover:bg-secondary" aria-label="Menu">
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
-      </nav>
+        {mobileOpen && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            className="md:hidden border-t border-border/50 bg-background/95 backdrop-blur px-4 py-4 flex flex-col gap-2 text-sm font-semibold">
+            <a onClick={() => setMobileOpen(false)} href="#planos" className="py-2">Planos</a>
+            <a onClick={() => setMobileOpen(false)} href="#flyers" className="py-2">Flyers</a>
+            <a onClick={() => setMobileOpen(false)} href="#sobre" className="py-2">Sobre</a>
+            <a onClick={() => setMobileOpen(false)} href="#contacto" className="py-2">Contacto</a>
+            <div className="flex gap-2 pt-2">
+              {!user && (
+                <>
+                  <Link to="/login" className="flex-1"><Button variant="outline" className="w-full rounded-full">Entrar</Button></Link>
+                  <Link to="/cadastro" className="flex-1"><Button className="w-full rounded-full bg-gradient-blue text-white">Criar conta</Button></Link>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </motion.nav>
 
       {/* HERO */}
-      <section className="pt-32 pb-20 mesh-bg grid-bg relative overflow-hidden">
+      <section className="pt-28 md:pt-32 pb-16 md:pb-20 mesh-bg grid-bg relative overflow-hidden">
         <div className="container mx-auto px-4">
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full liquid-glass mb-6">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold">Criamos história que inovam</span>
+            <div className="inline-flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full liquid-glass mb-5 md:mb-6">
+              <Sparkles className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
+              <span className="text-xs md:text-sm font-semibold">Criamos história que inovam</span>
             </div>
-            <h1 className="text-5xl md:text-7xl font-display font-extrabold tracking-tight mb-6 leading-[1.05]">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-display font-extrabold tracking-tight mb-5 md:mb-6 leading-[1.05]">
               O seu negócio merece um <span className="gradient-text">site profissional</span>
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Sites + domínio + hospedagem desde <span className="font-bold text-foreground">{formatKz(98000)}</span>. 
+            <p className="text-base md:text-xl text-muted-foreground mb-7 md:mb-8 max-w-2xl mx-auto px-2">
+              Sites + domínio + hospedagem desde <span className="font-bold text-foreground">{formatKz(98000)}</span>.
               Hospedagem premium, flyers de alto impacto e marketing digital em Angola.
             </p>
-            <div className="flex flex-wrap items-center justify-center gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 md:gap-4 px-4 sm:px-0">
               <a href="#planos">
-                <Button size="lg" className="rounded-full bg-gradient-blue text-white shadow-strong hover:shadow-glow text-base h-14 px-8">
+                <Button size="lg" className="w-full sm:w-auto rounded-full bg-gradient-blue text-white shadow-strong hover:shadow-glow text-base h-14 px-8">
                   Ver Planos <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </a>
-              <a href={SITE.whatsapp} target="_blank" rel="noopener">
-                <Button size="lg" variant="outline" className="rounded-full h-14 px-8 text-base border-2">
-                  Falar no WhatsApp
-                </Button>
-              </a>
+              {user ? (
+                <Link to="/dashboard">
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto rounded-full h-14 px-8 text-base border-2">
+                    Ir para painel
+                  </Button>
+                </Link>
+              ) : (
+                <Link to="/cadastro">
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto rounded-full h-14 px-8 text-base border-2">
+                    Criar conta
+                  </Button>
+                </Link>
+              )}
             </div>
           </motion.div>
         </div>
