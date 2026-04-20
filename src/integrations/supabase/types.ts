@@ -83,6 +83,39 @@ export type Database = {
         }
         Relationships: []
       }
+      messages: {
+        Row: {
+          attachment_url: string | null
+          body: string | null
+          conversation_user_id: string
+          created_at: string
+          id: string
+          is_admin_sender: boolean
+          read_at: string | null
+          sender_id: string
+        }
+        Insert: {
+          attachment_url?: string | null
+          body?: string | null
+          conversation_user_id: string
+          created_at?: string
+          id?: string
+          is_admin_sender?: boolean
+          read_at?: string | null
+          sender_id: string
+        }
+        Update: {
+          attachment_url?: string | null
+          body?: string | null
+          conversation_user_id?: string
+          created_at?: string
+          id?: string
+          is_admin_sender?: boolean
+          read_at?: string | null
+          sender_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -177,6 +210,53 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "service_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_proofs: {
+        Row: {
+          amount: number | null
+          created_at: string
+          id: string
+          image_url: string
+          notes: string | null
+          order_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          id?: string
+          image_url: string
+          notes?: string | null
+          order_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          id?: string
+          image_url?: string
+          notes?: string | null
+          order_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_proofs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
