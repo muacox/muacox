@@ -35,7 +35,12 @@ const AdminDashboard = () => {
   const [activeChat, setActiveChat] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && (!user || !isAdmin)) navigate("/dashboard");
+    // Se não tem sessão → vai para login. Se tem sessão mas não é admin → vai para painel cliente.
+    // Não revelamos a existência da rota a quem não é admin.
+    if (!loading) {
+      if (!user) navigate("/login", { replace: true });
+      else if (!isAdmin) navigate("/dashboard", { replace: true });
+    }
   }, [loading, user, isAdmin, navigate]);
 
   useEffect(() => {
