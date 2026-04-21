@@ -81,13 +81,19 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
   };
 
   return (
-    <div className="flex flex-col h-full bg-background rounded-2xl border border-border overflow-hidden">
-      <div className="px-4 py-3 border-b border-border bg-gradient-blue text-white flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-        <p className="font-bold text-sm">Suporte MuacoX — Isaac Muaco</p>
+    <div className={`flex flex-col bg-background border border-border overflow-hidden ${fullScreen ? "h-[calc(100vh-7rem)] md:h-[calc(100vh-6rem)] rounded-2xl" : "h-full rounded-2xl"}`}>
+      <div className="px-4 py-3 border-b border-border bg-gradient-blue text-white flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-sm">IM</div>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-sm truncate">Suporte MuacoX — Isaac Muaco</p>
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+            <p className="text-[11px] text-white/80">online</p>
+          </div>
+        </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[300px] max-h-[60vh]">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-secondary/30">
         {messages.length === 0 && (
           <div className="text-center text-muted-foreground text-sm py-10">
             <p>👋 Olá! Envia-nos uma mensagem ou comprovativo de pagamento.</p>
