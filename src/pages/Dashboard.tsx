@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, FileText, Clock, CheckCircle2, XCircle, MessageCircle, Receipt, ExternalLink } from "lucide-react";
+import { Plus, FileText, Clock, CheckCircle2, XCircle, MessageCircle, Receipt, ExternalLink, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { ChatPanel, PaymentProofUpload } from "@/components/ChatPanel";
+import { ProfileSettings } from "@/components/ProfileSettings";
 import { SITE, formatKz } from "@/lib/site";
 import { toast } from "sonner";
 
@@ -58,9 +59,10 @@ const Dashboard = () => {
         </motion.div>
 
         <Tabs defaultValue="pedidos" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 md:w-auto md:inline-grid h-12 rounded-2xl">
+          <TabsList className="grid w-full grid-cols-3 md:w-auto md:inline-grid h-12 rounded-2xl">
             <TabsTrigger value="pedidos" className="rounded-xl"><FileText className="h-4 w-4 mr-2" />Pedidos</TabsTrigger>
             <TabsTrigger value="chat" className="rounded-xl"><MessageCircle className="h-4 w-4 mr-2" />Chat</TabsTrigger>
+            <TabsTrigger value="perfil" className="rounded-xl"><UserIcon className="h-4 w-4 mr-2" />Perfil</TabsTrigger>
           </TabsList>
 
           <TabsContent value="pedidos" className="space-y-4">
@@ -118,6 +120,10 @@ const Dashboard = () => {
 
           <TabsContent value="chat">
             <ChatPanel conversationUserId={user.id} currentUserId={user.id} isAdmin={false} fullScreen />
+          </TabsContent>
+
+          <TabsContent value="perfil">
+            <ProfileSettings />
           </TabsContent>
         </Tabs>
       </div>
