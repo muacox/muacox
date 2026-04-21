@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { SITE, formatKz } from "@/lib/site";
 import logo from "@/assets/muacox-logo.png";
+import isaacPhoto from "@/assets/isaac-muaco.jpg";
 import flyer1 from "@/assets/flyers/flyer-marketing.png";
 import flyer2 from "@/assets/flyers/flyer-freddy.png";
 import flyer3 from "@/assets/flyers/flyer-programador.png";
@@ -34,6 +35,7 @@ const Index = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [hidden, setHidden] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [paidCount, setPaidCount] = useState(50);
   const { scrollY } = useScroll();
   const { user } = useAuth();
 
@@ -47,6 +49,17 @@ const Index = () => {
     supabase.from("service_plans").select("*").eq("active", true).order("display_order").then(({ data }) => {
       if (data) setPlans(data as any);
     });
+    // Contagem dinâmica: 50 base + pedidos pagos/concluídos
+    const loadCount = () => {
+      supabase.from("orders").select("id", { count: "exact", head: true })
+        .in("status", ["paid", "completed"])
+        .then(({ count }) => setPaidCount(50 + (count || 0)));
+    };
+    loadCount();
+    const ch = supabase.channel("public-orders-count")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, loadCount)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, []);
 
   const websitePlans = plans.filter(p => p.category === 'website');
@@ -119,8 +132,8 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-[1.2fr_1fr] gap-8 lg:gap-12 items-center max-w-7xl mx-auto">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-foreground text-background text-[11px] font-bold mb-5">
-                <Sparkle className="h-3 w-3" />
+              <div className="inline-flex items-center gap-2 text-[11px] font-bold mb-5 text-foreground">
+                <Sparkle className="h-3 w-3 text-primary" />
                 <span className="tracking-wider uppercase">Estúdio digital premium</span>
               </div>
               <h1 className="text-[2.5rem] sm:text-5xl md:text-6xl lg:text-7xl font-display font-extrabold tracking-[-0.04em] leading-[0.95] mb-5">
@@ -143,9 +156,9 @@ const Index = () => {
                 </a>
               </div>
 
-              {/* Stats em row */}
+              {/* Stats em row — sem bordas */}
               <div className="grid grid-cols-3 gap-3 md:gap-6 mt-10 max-w-md">
-                {[["50+", "Projectos"], ["100%", "Satisfação"], ["24/7", "Suporte"]].map(([n, l]) => (
+                {[[`${paidCount}+`, "Projectos"], ["100%", "Satisfação"], ["24/7", "Suporte"]].map(([n, l]) => (
                   <div key={l}>
                     <p className="text-2xl md:text-3xl font-display font-extrabold gradient-text">{n}</p>
                     <p className="text-[11px] md:text-xs text-muted-foreground uppercase tracking-wider font-semibold">{l}</p>
@@ -251,9 +264,8 @@ const Index = () => {
             <motion.div initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}
               className="relative w-40 h-40 md:w-56 md:h-56 mx-auto md:mx-0">
               <div className="absolute inset-0 bg-gradient-blue rounded-3xl rotate-6" />
-              <div className="absolute inset-0 bg-foreground rounded-3xl -rotate-3 flex items-center justify-center text-background text-6xl md:text-7xl font-display font-extrabold">
-                IM
-              </div>
+              <img src={isaacPhoto} alt={SITE.founder}
+                className="absolute inset-0 w-full h-full object-cover rounded-3xl -rotate-3 shadow-strong" />
             </motion.div>
             <div className="text-center md:text-left">
               <p className="text-xs font-bold tracking-[0.2em] uppercase text-primary mb-3">Sobre</p>

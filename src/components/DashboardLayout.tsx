@@ -51,8 +51,17 @@ export const DashboardLayout = ({ children, admin }: Props) => {
           )}
         </nav>
         <div className="border-t border-border pt-4">
-          <p className="text-xs text-muted-foreground mb-1">Sessão</p>
-          <p className="text-sm font-bold truncate">{profile?.full_name || "Utilizador"}</p>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-blue flex items-center justify-center text-white font-bold shrink-0">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (profile?.full_name || "?").charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Sessão</p>
+              <p className="text-sm font-bold truncate">{profile?.full_name || "Utilizador"}</p>
+            </div>
+          </div>
           <Button variant="ghost" size="sm" onClick={handleSignOut} className="w-full justify-start mt-2 text-destructive hover:text-destructive">
             <LogOut className="h-4 w-4 mr-2" />Sair
           </Button>

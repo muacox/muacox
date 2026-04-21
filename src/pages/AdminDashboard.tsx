@@ -29,10 +29,10 @@ interface Order {
   plan_id: string | null; created_at: string;
 }
 interface Proof { id: string; user_id: string; order_id: string | null; image_url: string; amount: number | null; status: string; created_at: string; notes: string | null; }
-interface Conv { user_id: string; full_name: string | null; last: string; unread: number; }
+interface Conv { user_id: string; full_name: string | null; avatar_url: string | null; last: string; unread: number; }
 interface Plan { id: string; name: string; category: string; price: number; description: string; features: any; active: boolean; highlighted: boolean; billing_cycle: string; display_order: number; }
 interface Flyer { id: string; title: string; image_url: string; category: string | null; description: string | null; active: boolean; display_order: number; }
-interface Profile { user_id: string; full_name: string | null; phone: string | null; created_at: string; }
+interface Profile { user_id: string; full_name: string | null; phone: string | null; avatar_url: string | null; created_at: string; }
 
 const COLORS = ["hsl(230 100% 50%)", "hsl(38 92% 50%)", "hsl(142 76% 36%)", "hsl(0 84% 60%)"];
 
@@ -63,7 +63,7 @@ const AdminDashboard = () => {
         supabase.from("messages").select("conversation_user_id, body, created_at, is_admin_sender").order("created_at", { ascending: false }).limit(500),
         supabase.from("service_plans").select("*").order("display_order"),
         supabase.from("flyer_gallery").select("*").order("display_order"),
-        supabase.from("profiles").select("user_id, full_name, phone, created_at").order("created_at", { ascending: false }),
+        supabase.from("profiles").select("user_id, full_name, phone, avatar_url, created_at").order("created_at", { ascending: false }),
       ]);
       if (o) setOrders(o as Order[]);
       if (p) setProofs(p as Proof[]);
@@ -75,15 +75,15 @@ const AdminDashboard = () => {
         (msgs as any[]).forEach(m => {
           if (!map.has(m.conversation_user_id)) {
             map.set(m.conversation_user_id, {
-              user_id: m.conversation_user_id, full_name: null,
+              user_id: m.conversation_user_id, full_name: null, avatar_url: null,
               last: m.body || "anexo", unread: 0,
             });
           }
         });
         const ids = Array.from(map.keys());
         if (ids.length) {
-          const { data: profs } = await supabase.from("profiles").select("user_id, full_name").in("user_id", ids);
-          (profs || []).forEach(p => { const c = map.get(p.user_id); if (c) c.full_name = p.full_name; });
+          const { data: profs } = await supabase.from("profiles").select("user_id, full_name, avatar_url").in("user_id", ids);
+          (profs || []).forEach(p => { const c = map.get(p.user_id); if (c) { c.full_name = p.full_name; c.avatar_url = p.avatar_url; } });
         }
         setConvs(Array.from(map.values()));
       }
@@ -284,10 +284,12 @@ const AdminDashboard = () => {
                     className={`w-full text-left p-3 rounded-xl transition flex items-center gap-3 ${
                       activeChat === c.user_id ? "bg-gradient-blue text-white" : "hover:bg-secondary"
                     }`}>
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                    <div className={`w-10 h-10 rounded-full overflow-hidden flex items-center justify-center font-bold shrink-0 ${
                       activeChat === c.user_id ? "bg-white/20" : "bg-gradient-blue text-white"
                     }`}>
-                      {(c.full_name || "?").charAt(0).toUpperCase()}
+                      {c.avatar_url ? (
+                        <img src={c.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (c.full_name || "?").charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-bold text-sm truncate">{c.full_name || "Cliente"}</p>
@@ -376,8 +378,10 @@ const CustomersTab = ({ profiles, orders }: { profiles: Profile[]; orders: Order
           return (
             <div key={p.user_id} className="bg-background rounded-2xl border border-border p-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-12 h-12 rounded-full bg-gradient-blue text-white flex items-center justify-center font-bold shrink-0">
-                  {(p.full_name || "?").charAt(0).toUpperCase()}
+                <div className="w-12 h-12 rounded-full overflow-hidden bg-gradient-blue text-white flex items-center justify-center font-bold shrink-0">
+                  {p.avatar_url ? (
+                    <img src={p.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (p.full_name || "?").charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
                   <p className="font-bold truncate">{p.full_name || "Sem nome"}</p>
