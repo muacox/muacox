@@ -414,6 +414,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      next_invoice_number: { Args: never; Returns: number }
     }
     Enums: {
       app_role: "admin" | "user"
