@@ -36,7 +36,7 @@ const Index = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [hidden, setHidden] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [paidCount, setPaidCount] = useState(50);
+  const [paidCount, setPaidCount] = useState(0);
   const { scrollY } = useScroll();
   const { user } = useAuth();
 
@@ -50,11 +50,11 @@ const Index = () => {
     supabase.from("service_plans").select("*").eq("active", true).order("display_order").then(({ data }) => {
       if (data) setPlans(data as any);
     });
-    // Contagem dinâmica: 50 base + pedidos pagos/concluídos
+    // Contagem real: apenas pedidos pagos/concluídos (admin marca pago após validar comprovativo)
     const loadCount = () => {
       supabase.from("orders").select("id", { count: "exact", head: true })
         .in("status", ["paid", "completed"])
-        .then(({ count }) => setPaidCount(50 + (count || 0)));
+        .then(({ count }) => setPaidCount(count || 0));
     };
     loadCount();
     const ch = supabase.channel("public-orders-count")
