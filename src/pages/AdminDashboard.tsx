@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   TrendingUp, DollarSign, Users, ShoppingBag, CheckCircle2, XCircle,
   MessageCircle, Receipt, Package, Image as ImageIcon, Bell, Plus,
-  Trash2, Edit3, Send, LayoutDashboard, FileBadge, Loader2, Download
+  Trash2, Edit3, Send, LayoutDashboard, FileBadge, Loader2, Download, Star, Quote
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ interface Conv { user_id: string; full_name: string | null; avatar_url: string |
 interface Plan { id: string; name: string; category: string; price: number; description: string; features: any; active: boolean; highlighted: boolean; billing_cycle: string; display_order: number; }
 interface Flyer { id: string; title: string; image_url: string; category: string | null; description: string | null; active: boolean; display_order: number; }
 interface Profile { user_id: string; full_name: string | null; phone: string | null; avatar_url: string | null; created_at: string; }
+interface Testimonial { id: string; author_name: string; message: string; rating: number; photo_url: string | null; approved: boolean; created_at: string; }
 
 const COLORS = ["hsl(230 100% 50%)", "hsl(38 92% 50%)", "hsl(142 76% 36%)", "hsl(0 84% 60%)"];
 
@@ -46,6 +47,7 @@ const AdminDashboard = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [flyers, setFlyers] = useState<Flyer[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [activeChat, setActiveChat] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,19 +60,21 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (!isAdmin) return;
     const load = async () => {
-      const [{ data: o }, { data: p }, { data: msgs }, { data: pl }, { data: fl }, { data: pr }] = await Promise.all([
+      const [{ data: o }, { data: p }, { data: msgs }, { data: pl }, { data: fl }, { data: pr }, { data: ts }] = await Promise.all([
         supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(500),
         supabase.from("payment_proofs").select("*").order("created_at", { ascending: false }).limit(200),
         supabase.from("messages").select("conversation_user_id, body, created_at, is_admin_sender").order("created_at", { ascending: false }).limit(500),
         supabase.from("service_plans").select("*").order("display_order"),
         supabase.from("flyer_gallery").select("*").order("display_order"),
         supabase.from("profiles").select("user_id, full_name, phone, avatar_url, created_at").order("created_at", { ascending: false }),
+        supabase.from("testimonials").select("*").order("created_at", { ascending: false }).limit(200),
       ]);
       if (o) setOrders(o as Order[]);
       if (p) setProofs(p as Proof[]);
       if (pl) setPlans(pl as any);
       if (fl) setFlyers(fl as Flyer[]);
       if (pr) setProfiles(pr as Profile[]);
+      if (ts) setTestimonials(ts as Testimonial[]);
       if (msgs) {
         const map = new Map<string, Conv>();
         (msgs as any[]).forEach(m => {
@@ -95,6 +99,7 @@ const AdminDashboard = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "payment_proofs" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "service_plans" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "flyer_gallery" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "testimonials" }, load)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, load)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -161,7 +166,7 @@ const AdminDashboard = () => {
         </motion.div>
 
         <Tabs defaultValue="overview" className="space-y-5">
-          <TabsList className="rounded-2xl h-auto p-1.5 grid grid-cols-4 md:flex md:flex-wrap gap-1 bg-secondary">
+          <TabsList className="rounded-2xl h-auto p-1.5 grid grid-cols-3 md:flex md:flex-wrap gap-1 bg-secondary">
             <Tab value="overview" icon={LayoutDashboard} label="Visão" />
             <Tab value="orders" icon={ShoppingBag} label="Pedidos" badge={orders.filter(o=>o.status==="pending").length} />
             <Tab value="proofs" icon={Receipt} label="Pagamentos" badge={proofsPending} />
@@ -169,6 +174,7 @@ const AdminDashboard = () => {
             <Tab value="customers" icon={Users} label="Clientes" />
             <Tab value="plans" icon={Package} label="Planos" />
             <Tab value="gallery" icon={ImageIcon} label="Galeria" />
+            <Tab value="testimonials" icon={Quote} label="Depoimentos" badge={testimonials.filter(t=>!t.approved).length} />
             <Tab value="notify" icon={Bell} label="Avisos" />
           </TabsList>
 
@@ -368,7 +374,12 @@ const AdminDashboard = () => {
             <GalleryTab flyers={flyers} userId={user!.id} />
           </TabsContent>
 
-          {/* 8. NOTIFICAÇÕES BROADCAST */}
+          {/* 8. DEPOIMENTOS — moderação */}
+          <TabsContent value="testimonials">
+            <TestimonialsAdminTab items={testimonials} />
+          </TabsContent>
+
+          {/* 9. NOTIFICAÇÕES BROADCAST */}
           <TabsContent value="notify">
             <BroadcastTab profiles={profiles} />
           </TabsContent>
@@ -627,6 +638,75 @@ const BroadcastTab = ({ profiles }: { profiles: Profile[] }) => {
       <Button onClick={send} disabled={sending} className="w-full h-12 rounded-xl bg-gradient-blue text-white font-bold">
         <Send className="h-4 w-4 mr-2" />{sending ? "A enviar…" : `Enviar a ${profiles.length} clientes`}
       </Button>
+    </div>
+  );
+};
+
+const TestimonialsAdminTab = ({ items }: { items: Testimonial[] }) => {
+  const toggleApprove = async (id: string, approved: boolean) => {
+    const { error } = await supabase.from("testimonials").update({ approved }).eq("id", id);
+    if (error) toast.error(error.message);
+    else toast.success(approved ? "Depoimento publicado" : "Despublicado");
+  };
+  const remove = async (id: string) => {
+    if (!confirm("Apagar este depoimento?")) return;
+    const { error } = await supabase.from("testimonials").delete().eq("id", id);
+    if (error) toast.error(error.message); else toast.success("Removido");
+  };
+
+  const pending = items.filter(t => !t.approved);
+  const approved = items.filter(t => t.approved);
+
+  const Card = ({ t }: { t: Testimonial }) => (
+    <div className="bg-background rounded-2xl border border-border p-4 flex gap-3">
+      <div className="w-12 h-12 rounded-full overflow-hidden bg-muted shrink-0 flex items-center justify-center font-bold text-primary">
+        {t.photo_url ? <img src={t.photo_url} alt="" className="w-full h-full object-cover" /> : t.author_name.charAt(0).toUpperCase()}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <p className="font-bold text-sm truncate">{t.author_name}</p>
+          <div className="flex">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Star key={i} className={`h-3 w-3 ${i < t.rating ? "fill-warning text-warning" : "text-muted-foreground/30"}`} />
+            ))}
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground mb-2 whitespace-pre-wrap break-words">{t.message}</p>
+        <p className="text-[11px] text-muted-foreground mb-3">{new Date(t.created_at).toLocaleString("pt-AO")}</p>
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" onClick={() => toggleApprove(t.id, !t.approved)}
+            className={`rounded-lg h-8 ${t.approved ? "bg-warning text-white hover:bg-warning/90" : "bg-success text-white hover:bg-success/90"}`}>
+            {t.approved ? "Despublicar" : "Aprovar"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => remove(t.id)} className="rounded-lg h-8 text-destructive hover:bg-destructive/10">
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="font-display font-extrabold text-lg mb-3 flex items-center gap-2">
+          Por aprovar
+          {pending.length > 0 && <span className="text-xs bg-warning text-white px-2 py-0.5 rounded-full">{pending.length}</span>}
+        </h3>
+        {pending.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sem depoimentos pendentes.</p>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-3">{pending.map(t => <Card key={t.id} t={t} />)}</div>
+        )}
+      </div>
+      <div>
+        <h3 className="font-display font-extrabold text-lg mb-3">Publicados ({approved.length})</h3>
+        {approved.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sem depoimentos publicados.</p>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-3">{approved.map(t => <Card key={t.id} t={t} />)}</div>
+        )}
+      </div>
     </div>
   );
 };
