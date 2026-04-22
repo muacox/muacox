@@ -1,0 +1,66 @@
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
+
+interface AvatarItem { user_id: string; full_name: string | null; avatar_url: string | null; }
+
+/**
+ * Tira "Estúdio digital premium" e mostra apenas avatares com anel
+ * dos utilizadores autenticados (com foto de perfil).
+ */
+export const AuthAvatarStrip = () => {
+  const [avatars, setAvatars] = useState<AvatarItem[]>([]);
+
+  useEffect(() => {
+    const load = () => {
+      supabase.from("profiles")
+        .select("user_id, full_name, avatar_url")
+        .not("avatar_url", "is", null)
+        .order("updated_at", { ascending: false })
+        .limit(8)
+        .then(({ data }) => { if (data) setAvatars(data as AvatarItem[]); });
+    };
+    load();
+    const ch = supabase.channel("public-avatars")
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+
+  if (avatars.length === 0) {
+    return (
+      <div className="inline-flex items-center gap-2 mb-5">
+        <div className="flex -space-x-2">
+          {[0, 1, 2].map(i => (
+            <div key={i} className="w-8 h-8 rounded-full ring-2 ring-primary/40 bg-gradient-blue" />
+          ))}
+        </div>
+        <span className="text-xs font-semibold text-muted-foreground">Comunidade activa</span>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="inline-flex items-center gap-3 mb-5">
+      <div className="flex -space-x-2.5">
+        {avatars.slice(0, 6).map((a, i) => (
+          <motion.div
+            key={a.user_id}
+            initial={{ scale: 0, x: -10 }}
+            animate={{ scale: 1, x: 0 }}
+            transition={{ delay: i * 0.05 }}
+            className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-background ring-offset-2 ring-offset-background relative"
+            style={{ boxShadow: "0 0 0 2px hsl(var(--primary) / 0.6)" }}
+            title={a.full_name || "Cliente"}
+          >
+            <img src={a.avatar_url!} alt="" className="w-full h-full object-cover" loading="lazy" />
+          </motion.div>
+        ))}
+      </div>
+      <div className="flex flex-col">
+        <span className="text-xs font-bold text-foreground leading-tight">+{avatars.length} clientes activos</span>
+        <span className="text-[10px] text-muted-foreground">a confiar na MuacoX</span>
+      </div>
+    </motion.div>
+  );
+};
