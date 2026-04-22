@@ -237,26 +237,48 @@ const AdminDashboard = () => {
           {/* 2. PEDIDOS */}
           <TabsContent value="orders">
             <div className="grid gap-3">
-              {orders.map(o => (
-                <div key={o.id} className="bg-background rounded-2xl border border-border p-4 flex flex-wrap gap-3 items-center justify-between">
-                  <div className="min-w-0">
-                    <p className="font-bold">{o.customer_name}</p>
-                    <p className="text-xs text-muted-foreground">{o.customer_email} · {o.customer_phone}</p>
-                    {o.notes && <p className="text-xs mt-1 line-clamp-1 max-w-md">{o.notes}</p>}
+              {orders.map(o => {
+                const plan = plans.find(p => p.id === o.plan_id);
+                return (
+                  <div key={o.id} className="bg-background rounded-2xl border border-border p-4 flex flex-wrap gap-3 items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-bold">{o.customer_name}</p>
+                        {plan && (
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                            {plan.category} · {plan.name}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{o.customer_email} · {o.customer_phone}</p>
+                      {o.notes && <p className="text-xs mt-1 line-clamp-1 max-w-md">{o.notes}</p>}
+                      {o.invoice_url && (
+                        <a href={o.invoice_url} target="_blank" rel="noopener"
+                          className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold text-success hover:underline">
+                          <FileBadge className="h-3.5 w-3.5" />Factura {o.invoice_number}
+                          <Download className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-bold">{formatKz(o.amount)}</p>
+                      <select value={o.status} onChange={e => updateOrderStatus(o.id, e.target.value)}
+                        className="h-9 rounded-lg border border-input bg-background px-2 text-xs font-semibold">
+                        <option value="pending">Pendente</option>
+                        <option value="paid">Pago</option>
+                        <option value="in_progress">Em curso</option>
+                        <option value="completed">Concluído</option>
+                        <option value="cancelled">Cancelado</option>
+                      </select>
+                      {(o.status === "paid" || o.status === "completed") && !o.invoice_url && (
+                        <Button size="sm" onClick={() => generateInvoice(o.id)} className="rounded-lg bg-success text-white hover:bg-success/90 h-9">
+                          <FileBadge className="h-3.5 w-3.5 mr-1" />Gerar factura
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-bold">{formatKz(o.amount)}</p>
-                    <select value={o.status} onChange={e => updateOrderStatus(o.id, e.target.value)}
-                      className="h-9 rounded-lg border border-input bg-background px-2 text-xs font-semibold">
-                      <option value="pending">Pendente</option>
-                      <option value="paid">Pago</option>
-                      <option value="in_progress">Em curso</option>
-                      <option value="completed">Concluído</option>
-                      <option value="cancelled">Cancelado</option>
-                    </select>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {orders.length === 0 && <p className="text-center text-muted-foreground py-10">Sem pedidos.</p>}
             </div>
           </TabsContent>
