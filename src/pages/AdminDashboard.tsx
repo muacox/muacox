@@ -642,4 +642,73 @@ const BroadcastTab = ({ profiles }: { profiles: Profile[] }) => {
   );
 };
 
+const TestimonialsAdminTab = ({ items }: { items: Testimonial[] }) => {
+  const toggleApprove = async (id: string, approved: boolean) => {
+    const { error } = await supabase.from("testimonials").update({ approved }).eq("id", id);
+    if (error) toast.error(error.message);
+    else toast.success(approved ? "Depoimento publicado" : "Despublicado");
+  };
+  const remove = async (id: string) => {
+    if (!confirm("Apagar este depoimento?")) return;
+    const { error } = await supabase.from("testimonials").delete().eq("id", id);
+    if (error) toast.error(error.message); else toast.success("Removido");
+  };
+
+  const pending = items.filter(t => !t.approved);
+  const approved = items.filter(t => t.approved);
+
+  const Card = ({ t }: { t: Testimonial }) => (
+    <div className="bg-background rounded-2xl border border-border p-4 flex gap-3">
+      <div className="w-12 h-12 rounded-full overflow-hidden bg-muted shrink-0 flex items-center justify-center font-bold text-primary">
+        {t.photo_url ? <img src={t.photo_url} alt="" className="w-full h-full object-cover" /> : t.author_name.charAt(0).toUpperCase()}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <p className="font-bold text-sm truncate">{t.author_name}</p>
+          <div className="flex">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Star key={i} className={`h-3 w-3 ${i < t.rating ? "fill-warning text-warning" : "text-muted-foreground/30"}`} />
+            ))}
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground mb-2 whitespace-pre-wrap break-words">{t.message}</p>
+        <p className="text-[11px] text-muted-foreground mb-3">{new Date(t.created_at).toLocaleString("pt-AO")}</p>
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" onClick={() => toggleApprove(t.id, !t.approved)}
+            className={`rounded-lg h-8 ${t.approved ? "bg-warning text-white hover:bg-warning/90" : "bg-success text-white hover:bg-success/90"}`}>
+            {t.approved ? "Despublicar" : "Aprovar"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => remove(t.id)} className="rounded-lg h-8 text-destructive hover:bg-destructive/10">
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="font-display font-extrabold text-lg mb-3 flex items-center gap-2">
+          Por aprovar
+          {pending.length > 0 && <span className="text-xs bg-warning text-white px-2 py-0.5 rounded-full">{pending.length}</span>}
+        </h3>
+        {pending.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sem depoimentos pendentes.</p>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-3">{pending.map(t => <Card key={t.id} t={t} />)}</div>
+        )}
+      </div>
+      <div>
+        <h3 className="font-display font-extrabold text-lg mb-3">Publicados ({approved.length})</h3>
+        {approved.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sem depoimentos publicados.</p>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-3">{approved.map(t => <Card key={t.id} t={t} />)}</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default AdminDashboard;
