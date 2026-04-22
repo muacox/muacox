@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Paperclip, Loader2, Image as ImageIcon } from "lucide-react";
+import { Send, Paperclip, Loader2, Image as ImageIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import isaacPhoto from "@/assets/isaac-muaco.jpg";
 
 interface Msg {
   id: string;
@@ -80,17 +81,33 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
     if (fileRef.current) fileRef.current.value = "";
   };
 
+  // Fullscreen takes the entire viewport (mobile-app feel) on small screens.
+  const containerClass = fullScreen
+    ? "fixed inset-0 z-40 md:static md:inset-auto md:z-auto flex flex-col bg-background overflow-hidden md:rounded-2xl md:border md:border-border md:h-[calc(100vh-8rem)]"
+    : "flex flex-col h-full bg-background border border-border rounded-2xl overflow-hidden";
+
   return (
-    <div className={`flex flex-col bg-background border border-border overflow-hidden ${fullScreen ? "h-[calc(100vh-7rem)] md:h-[calc(100vh-6rem)] rounded-2xl" : "h-full rounded-2xl"}`}>
-      <div className="px-4 py-3 border-b border-border bg-gradient-blue text-white flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-sm">IM</div>
+    <div className={containerClass}>
+      <div className="px-4 py-3 border-b border-border bg-gradient-blue text-white flex items-center gap-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <div className="w-11 h-11 rounded-full overflow-hidden ring-2 ring-white/40 shrink-0">
+          <img src={isaacPhoto} alt="Isaac Muaco" className="w-full h-full object-cover" />
+        </div>
         <div className="flex-1 min-w-0">
           <p className="font-bold text-sm truncate">Suporte MuacoX — Isaac Muaco</p>
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-            <p className="text-[11px] text-white/80">online</p>
+            <p className="text-[11px] text-white/80">online agora</p>
           </div>
         </div>
+        {fullScreen && (
+          <button
+            onClick={() => window.history.back()}
+            className="md:hidden w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition"
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-secondary/30">
@@ -127,7 +144,7 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
         </AnimatePresence>
       </div>
 
-      <div className="p-3 border-t border-border bg-background flex items-center gap-2">
+      <div className="p-3 border-t border-border bg-background flex items-center gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleFile} />
         <Button type="button" size="icon" variant="ghost" onClick={() => fileRef.current?.click()} disabled={sending}>
           <Paperclip className="h-5 w-5" />

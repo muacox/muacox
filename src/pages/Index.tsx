@@ -3,13 +3,14 @@ import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import {
   ArrowRight, Globe, Server, Image as ImageIcon, Mail, Phone, Check,
   LayoutDashboard, LogIn, Menu, X, Zap, Shield, Headphones, Rocket,
-  Star, MapPin, Sparkle
+  Star, MapPin
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { SITE, formatKz } from "@/lib/site";
+import { AuthAvatarStrip } from "@/components/AuthAvatarStrip";
 import logo from "@/assets/muacox-logo.png";
 import isaacPhoto from "@/assets/isaac-muaco.jpg";
 import flyer1 from "@/assets/flyers/flyer-marketing.png";
@@ -132,10 +133,7 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-[1.2fr_1fr] gap-8 lg:gap-12 items-center max-w-7xl mx-auto">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-              <div className="inline-flex items-center gap-2 text-[11px] font-bold mb-5 text-foreground">
-                <Sparkle className="h-3 w-3 text-primary" />
-                <span className="tracking-wider uppercase">Estúdio digital premium</span>
-              </div>
+              <AuthAvatarStrip />
               <h1 className="text-[2.5rem] sm:text-5xl md:text-6xl lg:text-7xl font-display font-extrabold tracking-[-0.04em] leading-[0.95] mb-5">
                 Sites que <span className="gradient-text">vendem</span>.<br />
                 Flyers que <span className="gradient-text">impressionam</span>.

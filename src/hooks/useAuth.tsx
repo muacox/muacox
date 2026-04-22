@@ -9,6 +9,8 @@ interface Profile {
   full_name: string | null;
   phone: string | null;
   avatar_url: string | null;
+  address?: string | null;
+  tax_id?: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
