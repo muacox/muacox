@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   TrendingUp, DollarSign, Users, ShoppingBag, CheckCircle2, XCircle,
   MessageCircle, Receipt, Package, Image as ImageIcon, Bell, Plus,
-  Trash2, Edit3, Send, LayoutDashboard
+  Trash2, Edit3, Send, LayoutDashboard, FileBadge, Loader2, Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ interface Order {
   id: string; user_id: string | null; customer_name: string; customer_email: string;
   customer_phone: string; amount: number; status: string; notes: string | null;
   plan_id: string | null; created_at: string;
+  invoice_url?: string | null; invoice_number?: string | null; service_type?: string | null;
 }
 interface Proof { id: string; user_id: string; order_id: string | null; image_url: string; amount: number | null; status: string; created_at: string; notes: string | null; }
 interface Conv { user_id: string; full_name: string | null; avatar_url: string | null; last: string; unread: number; }
@@ -118,11 +119,28 @@ const AdminDashboard = () => {
     { name: "Concluído", value: orders.filter(o => o.status === "completed").length },
   ].filter(d => d.value > 0);
 
+  const generateInvoice = async (orderId: string) => {
+    toast.loading("A gerar factura…", { id: `inv-${orderId}` });
+    const { data, error } = await supabase.functions.invoke("generate-invoice", { body: { order_id: orderId } });
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || "Erro ao gerar factura", { id: `inv-${orderId}` });
+      return null;
+    }
+    toast.success("Factura gerada!", { id: `inv-${orderId}` });
+    return (data as any)?.url as string;
+  };
+
   const updateOrderStatus = async (id: string, status: string) => {
     const patch: any = { status };
     if (status === "paid") patch.paid_at = new Date().toISOString();
     const { error } = await supabase.from("orders").update(patch).eq("id", id);
-    if (error) toast.error(error.message); else toast.success("Pedido actualizado");
+    if (error) { toast.error(error.message); return; }
+    toast.success("Pedido actualizado");
+    // Auto-generate invoice when marking as paid
+    if (status === "paid") {
+      const order = orders.find(o => o.id === id);
+      if (order && !order.invoice_url) await generateInvoice(id);
+    }
   };
 
   const reviewProof = async (id: string, status: "approved" | "rejected", orderId?: string | null) => {
