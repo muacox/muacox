@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, FileText, Clock, CheckCircle2, XCircle, MessageCircle, Receipt, ExternalLink, User as UserIcon } from "lucide-react";
+import { Plus, FileText, Clock, CheckCircle2, XCircle, MessageCircle, Receipt, ExternalLink, User as UserIcon, Download, Globe, Server, Image as ImageIcon, FileBadge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +20,7 @@ interface Plan { id: string; name: string; category: string; price: number; }
 interface Order {
   id: string; customer_name: string; amount: number; status: string;
   notes: string | null; created_at: string; plan_id: string | null;
+  invoice_url?: string | null; invoice_number?: string | null; service_type?: string | null;
 }
 
 const Dashboard = () => {
@@ -50,16 +51,37 @@ const Dashboard = () => {
 
   if (!user) return null;
 
+  // KPI cards (organize the dashboard)
+  const totalSpent = orders.filter(o => ["paid","completed"].includes(o.status)).reduce((s,o)=>s+Number(o.amount),0);
+  const pendingCount = orders.filter(o => o.status === "pending").length;
+  const inProgressCount = orders.filter(o => o.status === "in_progress").length;
+  const completedCount = orders.filter(o => ["paid","completed"].includes(o.status)).length;
+
   return (
     <DashboardLayout>
       <div className="p-4 md:p-8 max-w-6xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-          <h1 className="text-3xl md:text-4xl font-display font-extrabold">Olá, {profile?.full_name?.split(" ")[0] || "amigo"} 👋</h1>
-          <p className="text-muted-foreground">Faz um pedido ou conversa connosco no chat.</p>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex items-center gap-4">
+          <div className="w-14 h-14 rounded-full overflow-hidden ring-2 ring-primary/40 ring-offset-2 ring-offset-background bg-gradient-blue text-white flex items-center justify-center font-display font-extrabold text-xl shrink-0">
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+            ) : (profile?.full_name || user.email || "?").charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-2xl md:text-3xl font-display font-extrabold truncate">Olá, {profile?.full_name?.split(" ")[0] || "amigo"}</h1>
+            <p className="text-sm text-muted-foreground">Faz um pedido ou conversa connosco no chat.</p>
+          </div>
         </motion.div>
 
+        {/* KPIs */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <KpiCard icon={FileText} label="Total pedidos" value={orders.length.toString()} tone="blue" />
+          <KpiCard icon={Clock} label="Pendentes" value={pendingCount.toString()} tone="warning" />
+          <KpiCard icon={CheckCircle2} label="Concluídos" value={completedCount.toString()} tone="success" />
+          <KpiCard icon={Receipt} label="Total investido" value={formatKz(totalSpent)} tone="dark" />
+        </div>
+
         <Tabs defaultValue="pedidos" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 md:w-auto md:inline-grid h-12 rounded-2xl">
+          <TabsList className="grid w-full grid-cols-3 md:w-auto md:inline-grid h-12 rounded-2xl bg-secondary p-1.5">
             <TabsTrigger value="pedidos" className="rounded-xl"><FileText className="h-4 w-4 mr-2" />Pedidos</TabsTrigger>
             <TabsTrigger value="chat" className="rounded-xl"><MessageCircle className="h-4 w-4 mr-2" />Chat</TabsTrigger>
             <TabsTrigger value="perfil" className="rounded-xl"><UserIcon className="h-4 w-4 mr-2" />Perfil</TabsTrigger>
@@ -77,43 +99,65 @@ const Dashboard = () => {
               </div>
             ) : (
               <div className="grid gap-4">
-                {orders.map(o => (
-                  <motion.div key={o.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                    className="bg-background rounded-2xl border border-border p-5 shadow-soft">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div>
-                        <p className="font-bold">{plans.find(p => p.id === o.plan_id)?.name || "Pedido personalizado"}</p>
-                        <p className="text-xs text-muted-foreground">{new Date(o.created_at).toLocaleString("pt-AO")}</p>
+                {orders.map(o => {
+                  const plan = plans.find(p => p.id === o.plan_id);
+                  const cat = plan?.category || o.service_type;
+                  const CatIcon = cat === "website" ? Globe : cat === "hosting" ? Server : cat === "flyer" ? ImageIcon : FileText;
+                  const catLabel = cat === "website" ? "Site" : cat === "hosting" ? "Hospedagem" : cat === "flyer" ? "Flyer" : "Personalizado";
+                  return (
+                    <motion.div key={o.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                      className="bg-background rounded-3xl border border-border p-5 shadow-soft hover:shadow-medium transition">
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                          <CatIcon className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-bold truncate">{plan?.name || "Pedido personalizado"}</p>
+                              <p className="text-[11px] uppercase font-bold tracking-wider text-primary">{catLabel}</p>
+                            </div>
+                            <StatusBadge status={o.status} />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">{new Date(o.created_at).toLocaleString("pt-AO")}</p>
+                        </div>
                       </div>
-                      <StatusBadge status={o.status} />
-                    </div>
-                    {o.notes && <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{o.notes}</p>}
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <p className="text-2xl font-display font-extrabold">{formatKz(o.amount)}</p>
-                      <div className="flex gap-2">
-                        <Dialog open={proofOpen === o.id} onOpenChange={v => setProofOpen(v ? o.id : null)}>
-                          <DialogTrigger asChild>
-                            <Button size="sm" variant="outline" className="rounded-full">
-                              <Receipt className="h-4 w-4 mr-1" />Comprovativo
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader><DialogTitle>Enviar comprovativo</DialogTitle></DialogHeader>
-                            <p className="text-sm text-muted-foreground mb-2">
-                              Faz a transferência e envia a foto. O admin vai aprovar manualmente.
-                            </p>
-                            <PaymentProofUpload userId={user.id} orderId={o.id} onUploaded={() => setProofOpen(null)} />
-                          </DialogContent>
-                        </Dialog>
-                        <a href={`${SITE.whatsapp}?text=${encodeURIComponent(`Olá! Pedido #${o.id.slice(0,8)}`)}`} target="_blank" rel="noopener">
-                          <Button size="sm" className="rounded-full bg-gradient-blue text-white">
-                            WhatsApp <ExternalLink className="h-3 w-3 ml-1" />
-                          </Button>
+                      {o.notes && <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{o.notes}</p>}
+                      {o.invoice_url && (
+                        <a href={o.invoice_url} target="_blank" rel="noopener"
+                          className="flex items-center gap-2 mb-3 text-xs font-semibold bg-success/10 text-success px-3 py-2 rounded-xl hover:bg-success/15 transition">
+                          <FileBadge className="h-4 w-4" />
+                          Factura {o.invoice_number || "disponível"}
+                          <Download className="h-3 w-3 ml-auto" />
                         </a>
+                      )}
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <p className="text-2xl font-display font-extrabold">{formatKz(o.amount)}</p>
+                        <div className="flex gap-2">
+                          <Dialog open={proofOpen === o.id} onOpenChange={v => setProofOpen(v ? o.id : null)}>
+                            <DialogTrigger asChild>
+                              <Button size="sm" variant="outline" className="rounded-full">
+                                <Receipt className="h-4 w-4 mr-1" />Comprovativo
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader><DialogTitle>Enviar comprovativo</DialogTitle></DialogHeader>
+                              <p className="text-sm text-muted-foreground mb-2">
+                                Faz a transferência e envia a foto. O admin vai aprovar manualmente.
+                              </p>
+                              <PaymentProofUpload userId={user.id} orderId={o.id} onUploaded={() => setProofOpen(null)} />
+                            </DialogContent>
+                          </Dialog>
+                          <a href={`${SITE.whatsapp}?text=${encodeURIComponent(`Olá! Pedido #${o.id.slice(0,8)}`)}`} target="_blank" rel="noopener">
+                            <Button size="sm" className="rounded-full bg-gradient-blue text-white">
+                              WhatsApp <ExternalLink className="h-3 w-3 ml-1" />
+                            </Button>
+                          </a>
+                        </div>
                       </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
@@ -128,6 +172,24 @@ const Dashboard = () => {
         </Tabs>
       </div>
     </DashboardLayout>
+  );
+};
+
+const KpiCard = ({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string; tone: "blue" | "warning" | "success" | "dark" }) => {
+  const tones: any = {
+    blue:    { bg: "bg-primary/10",     text: "text-primary" },
+    warning: { bg: "bg-warning/15",     text: "text-warning" },
+    success: { bg: "bg-success/15",     text: "text-success" },
+    dark:    { bg: "bg-foreground/5",   text: "text-foreground" },
+  };
+  return (
+    <motion.div whileHover={{ y: -2 }} className="bg-background rounded-2xl border border-border p-3 md:p-4 shadow-soft">
+      <div className={`w-9 h-9 rounded-xl ${tones[tone].bg} ${tones[tone].text} flex items-center justify-center mb-2`}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">{label}</p>
+      <p className="text-base md:text-lg font-display font-extrabold truncate">{value}</p>
+    </motion.div>
   );
 };
 
