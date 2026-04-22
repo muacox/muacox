@@ -53,11 +53,18 @@ Deno.serve(async (req) => {
       profile = data;
     }
 
-    // Sequential number
+    // Sequential number from sequence (admin client bypasses RLS)
     let invoiceNumber = order.invoice_number;
     if (!invoiceNumber) {
-      const { data: seq } = await admin.rpc("nextval", { sequence_name: "invoice_seq" }).catch(() => ({ data: null }));
-      const num = seq ?? Date.now() % 100000;
+      let num: number = Date.now() % 100000;
+      try {
+        const { data: seqRow } = await admin
+          .from("orders").select("id").limit(0); // warm-up no-op
+        // Use a raw query through the postgrest function we created
+        const { data: rpcData } = await admin.rpc("next_invoice_number" as any);
+        if (typeof rpcData === "number") num = rpcData;
+        else if (rpcData != null) num = Number(rpcData);
+      } catch (_e) { /* fallback to timestamp */ }
       invoiceNumber = `MX-${new Date().getFullYear()}-${String(num).padStart(5, "0")}`;
     }
 
