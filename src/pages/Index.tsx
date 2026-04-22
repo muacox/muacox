@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { SITE, formatKz } from "@/lib/site";
 import { AuthAvatarStrip } from "@/components/AuthAvatarStrip";
+import { TestimonialsSection } from "@/components/TestimonialsSection";
 import logo from "@/assets/muacox-logo.png";
 import isaacPhoto from "@/assets/isaac-muaco.jpg";
 import flyer1 from "@/assets/flyers/flyer-marketing.png";
@@ -281,6 +282,9 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      {/* DEPOIMENTOS */}
+      <TestimonialsSection />
 
       {/* CONTACTO */}
       <section id="contacto" className="py-20 md:py-28 bg-foreground text-background relative overflow-hidden">
