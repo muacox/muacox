@@ -53,6 +53,7 @@ Deno.serve(async (req) => {
       profile = data;
     }
 
+    const force = body.force === true;
     let invoiceNumber = order.invoice_number;
     if (!invoiceNumber) {
       let num: number = Date.now() % 100000;
@@ -63,6 +64,9 @@ Deno.serve(async (req) => {
       } catch (_e) { /* fallback */ }
       invoiceNumber = `MX-${new Date().getFullYear()}-${String(num).padStart(5, "0")}`;
     }
+    // If invoice exists and not forced, just return current url
+    // (force=true is used by /regenerate-invoices to refresh template)
+    void force;
 
     // Fetch logo as base64
     let logoData: string | null = null;
