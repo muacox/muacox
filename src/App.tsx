@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import FreelancerDashboard from "./pages/FreelancerDashboard";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             {/* Rota admin oculta — só acessível por link directo + verificação isAdmin */}
             <Route path="/mx-control-9f3a2b" element={<AdminDashboard />} />
+            <Route path="/freelancer" element={<FreelancerDashboard />} />
             <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
