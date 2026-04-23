@@ -5,23 +5,21 @@ import { supabase } from "@/integrations/supabase/client";
 interface AvatarItem { user_id: string; full_name: string | null; avatar_url: string | null; }
 
 /**
- * Tira "Estúdio digital premium" e mostra apenas avatares com anel
- * dos utilizadores autenticados (com foto de perfil).
+ * Anel de avatares públicos — mostra TODOS os utilizadores que têm foto
+ * de perfil, independentemente do visitante estar ou não autenticado.
+ * RLS na tabela `profiles` apenas permite ao próprio utilizador (ou admin)
+ * fazer SELECT, por isso usamos a edge function pública `public-avatars`.
  */
 export const AuthAvatarStrip = () => {
   const [avatars, setAvatars] = useState<AvatarItem[]>([]);
 
   useEffect(() => {
-    const load = () => {
-      supabase.from("profiles")
-        .select("user_id, full_name, avatar_url")
-        .not("avatar_url", "is", null)
-        .order("updated_at", { ascending: false })
-        .limit(8)
-        .then(({ data }) => { if (data) setAvatars(data as AvatarItem[]); });
+    const load = async () => {
+      const { data, error } = await supabase.functions.invoke("public-avatars");
+      if (!error && data?.avatars) setAvatars(data.avatars as AvatarItem[]);
     };
     load();
-    const ch = supabase.channel("public-avatars")
+    const ch = supabase.channel("public-avatars-strip")
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, load)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
