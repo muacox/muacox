@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.claim-bonus]
 verify_jwt = false
+
+[functions.public-avatars]
+verify_jwt = false
+
+[functions.download-invoice]
+verify_jwt = false
