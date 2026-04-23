@@ -47,6 +47,66 @@ export type Database = {
         }
         Relationships: []
       }
+      freelancers: {
+        Row: {
+          accepted_at: string | null
+          available: boolean
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          full_name: string | null
+          hourly_rate: number | null
+          id: string
+          invited_at: string
+          invited_by: string
+          invited_email: string
+          is_online: boolean
+          last_seen: string | null
+          specialty: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          available?: boolean
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          full_name?: string | null
+          hourly_rate?: number | null
+          id?: string
+          invited_at?: string
+          invited_by: string
+          invited_email: string
+          is_online?: boolean
+          last_seen?: string | null
+          specialty?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          available?: boolean
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          full_name?: string | null
+          hourly_rate?: number | null
+          id?: string
+          invited_at?: string
+          invited_by?: string
+          invited_email?: string
+          is_online?: boolean
+          last_seen?: string | null
+          specialty?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       hired_users: {
         Row: {
           accepted_at: string | null
@@ -83,8 +143,36 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_download_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          invoice_number: string
+          order_id: string
+          token: string
+          used_count: number
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          invoice_number: string
+          order_id: string
+          token: string
+          used_count?: number
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          invoice_number?: string
+          order_id?: string
+          token?: string
+          used_count?: number
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
+          assigned_to: string | null
           attachment_url: string | null
           body: string | null
           conversation_user_id: string
@@ -95,6 +183,7 @@ export type Database = {
           sender_id: string
         }
         Insert: {
+          assigned_to?: string | null
           attachment_url?: string | null
           body?: string | null
           conversation_user_id: string
@@ -105,6 +194,7 @@ export type Database = {
           sender_id: string
         }
         Update: {
+          assigned_to?: string | null
           attachment_url?: string | null
           body?: string | null
           conversation_user_id?: string
@@ -152,6 +242,7 @@ export type Database = {
       orders: {
         Row: {
           amount: number
+          assigned_to: string | null
           created_at: string | null
           currency: string | null
           customer_email: string
@@ -173,6 +264,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          assigned_to?: string | null
           created_at?: string | null
           currency?: string | null
           customer_email: string
@@ -194,6 +286,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          assigned_to?: string | null
           created_at?: string | null
           currency?: string | null
           customer_email?: string
@@ -447,10 +540,11 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_active_freelancer: { Args: { _user_id: string }; Returns: boolean }
       next_invoice_number: { Args: never; Returns: number }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "freelancer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -578,7 +672,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "freelancer"],
     },
   },
 } as const
