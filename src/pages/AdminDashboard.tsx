@@ -4,8 +4,9 @@ import { motion } from "framer-motion";
 import {
   TrendingUp, DollarSign, Users, ShoppingBag, CheckCircle2, XCircle,
   MessageCircle, Receipt, Package, Image as ImageIcon, Bell, Plus,
-  Trash2, Edit3, Send, LayoutDashboard, FileBadge, Loader2, Download, Star, Quote
+  Trash2, Edit3, Send, LayoutDashboard, FileBadge, Loader2, Download, Star, Quote, Briefcase, Link2
 } from "lucide-react";
+import { FreelancersManager } from "@/components/FreelancersManager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -175,8 +176,11 @@ const AdminDashboard = () => {
             <Tab value="plans" icon={Package} label="Planos" />
             <Tab value="gallery" icon={ImageIcon} label="Galeria" />
             <Tab value="testimonials" icon={Quote} label="Depoimentos" badge={testimonials.filter(t=>!t.approved).length} />
+            <Tab value="team" icon={Briefcase} label="Equipa" />
             <Tab value="notify" icon={Bell} label="Avisos" />
           </TabsList>
+
+          <TabsContent value="team"><FreelancersManager /></TabsContent>
 
           {/* 1. VISÃO GERAL */}
           <TabsContent value="overview" className="space-y-5">
