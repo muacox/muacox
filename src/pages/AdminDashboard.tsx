@@ -246,6 +246,16 @@ const AdminDashboard = () => {
 
           {/* 2. PEDIDOS */}
           <TabsContent value="orders">
+            <div className="flex justify-end mb-3">
+              <Button size="sm" variant="outline" className="rounded-full" onClick={async () => {
+                toast.loading("A refazer facturas com novo modelo angolano…", { id: "regen" });
+                const { data, error } = await supabase.functions.invoke("regenerate-invoices");
+                if (error) toast.error(error.message, { id: "regen" });
+                else toast.success(`${(data as any)?.regenerated || 0} facturas actualizadas`, { id: "regen" });
+              }}>
+                <FileBadge className="h-3.5 w-3.5 mr-1.5" />Refazer todas as facturas
+              </Button>
+            </div>
             <div className="grid gap-3">
               {orders.map(o => {
                 const plan = plans.find(p => p.id === o.plan_id);
