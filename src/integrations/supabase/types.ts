@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      blocked_ips: {
+        Row: {
+          blocked_by: string | null
+          created_at: string
+          id: string
+          ip: string
+          notes: string | null
+          reason: string
+        }
+        Insert: {
+          blocked_by?: string | null
+          created_at?: string
+          id?: string
+          ip: string
+          notes?: string | null
+          reason?: string
+        }
+        Update: {
+          blocked_by?: string | null
+          created_at?: string
+          id?: string
+          ip?: string
+          notes?: string | null
+          reason?: string
+        }
+        Relationships: []
+      }
       flyer_gallery: {
         Row: {
           active: boolean | null
@@ -173,6 +200,7 @@ export type Database = {
       messages: {
         Row: {
           assigned_to: string | null
+          attachment_kind: string | null
           attachment_url: string | null
           body: string | null
           conversation_user_id: string
@@ -184,6 +212,7 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          attachment_kind?: string | null
           attachment_url?: string | null
           body?: string | null
           conversation_user_id: string
@@ -195,6 +224,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          attachment_kind?: string | null
           attachment_url?: string | null
           body?: string | null
           conversation_user_id?: string
@@ -426,6 +456,33 @@ export type Database = {
           is_admin_device?: boolean | null
           p256dh?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      security_incidents: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          ip: string | null
+          kind: string
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          ip?: string | null
+          kind: string
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          ip?: string | null
+          kind?: string
+          user_agent?: string | null
         }
         Relationships: []
       }
