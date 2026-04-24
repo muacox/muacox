@@ -15,12 +15,15 @@ import FreelancerDashboard from "./pages/FreelancerDashboard";
 
 const queryClient = new QueryClient();
 
+const ThemeMount = () => { useSiteTheme(); return null; };
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
       <AuthProvider>
         <TooltipProvider>
           <SecurityGuard />
+          <ThemeMount />
           <Toaster />
           <Sonner />
           <Routes>
