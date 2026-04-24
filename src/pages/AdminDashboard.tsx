@@ -299,7 +299,7 @@ const AdminDashboard = () => {
                         <option value="completed">Concluído</option>
                         <option value="cancelled">Cancelado</option>
                       </select>
-                      {(o.status === "paid" || o.status === "completed") && !o.invoice_url && (
+                      {(o.status === "paid" || o.status === "completed") && !o.invoice_number && (
                         <Button size="sm" onClick={() => generateInvoice(o.id)} className="rounded-lg bg-success text-white hover:bg-success/90 h-9">
                           <FileBadge className="h-3.5 w-3.5 mr-1" />Gerar factura
                         </Button>
