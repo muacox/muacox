@@ -41,26 +41,46 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // ── Fetch online agents (admin + active freelancers with is_online=true) ──
+  // ── Fetch online agents from real presence (no hardcoded Isaac duplication) ──
+  // Admins are tracked via `freelancers` rows where status='active' AND we look up their role.
+  // To keep things simple & consistent with the existing presence system, we list every
+  // freelancers row with is_online=true. If a row's user_id has the 'admin' role we tag it as admin.
   useEffect(() => {
     let mounted = true;
     const loadAgents = async () => {
-      const { data } = await supabase
+      const { data: online } = await supabase
         .from("freelancers")
         .select("user_id, full_name, avatar_url, status, is_online")
         .eq("status", "active")
         .eq("is_online", true);
+
+      const userIds = (online || []).map((f: any) => f.user_id).filter(Boolean);
+      let adminIds = new Set<string>();
+      if (userIds.length) {
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("user_id, role")
+          .in("user_id", userIds)
+          .eq("role", "admin");
+        adminIds = new Set((roles || []).map((r: any) => r.user_id));
+      }
+
       if (!mounted) return;
-      const list: OnlineAgent[] = (data || [])
-        .filter((f: any) => f.user_id)
-        .map((f: any) => ({
+      const seen = new Set<string>();
+      const list: OnlineAgent[] = [];
+      for (const f of online || []) {
+        if (!f.user_id || seen.has(f.user_id)) continue;
+        seen.add(f.user_id);
+        const isAdminAgent = adminIds.has(f.user_id);
+        list.push({
           user_id: f.user_id,
-          full_name: f.full_name || "Freelancer",
-          avatar_url: f.avatar_url,
-          role: "freelancer" as const,
-        }));
-      // Always include Isaac (admin) as the lead
-      list.unshift({ user_id: "admin", full_name: "Isaac Muaco", avatar_url: isaacPhoto, role: "admin" });
+          full_name: f.full_name || (isAdminAgent ? "Admin" : "Freelancer"),
+          avatar_url: f.avatar_url || (isAdminAgent ? isaacPhoto : null),
+          role: isAdminAgent ? "admin" : "freelancer",
+        });
+      }
+      // Admins first
+      list.sort((a, b) => (a.role === b.role ? 0 : a.role === "admin" ? -1 : 1));
       setAgents(list);
     };
     loadAgents();
@@ -68,7 +88,7 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
       .channel("freelancers-presence")
       .on("postgres_changes", { event: "*", schema: "public", table: "freelancers" }, loadAgents)
       .subscribe();
-    const t = setTimeout(() => setShowWelcome(false), 4000);
+    const t = setTimeout(() => setShowWelcome(false), 4500);
     return () => { mounted = false; supabase.removeChannel(ch); clearTimeout(t); };
   }, []);
 
@@ -181,10 +201,14 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
           <img src={isaacPhoto} alt="Isaac Muaco" className="w-full h-full object-cover" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm truncate">Suporte MuacoX — Isaac Muaco</p>
+          <p className="font-bold text-sm truncate">Suporte MuacoX</p>
           <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-            <p className="text-[11px] text-white/80">{agents.length} {agents.length === 1 ? "agente online" : "agentes online"}</p>
+            <div className={`w-1.5 h-1.5 rounded-full ${agents.length > 0 ? "bg-success animate-pulse" : "bg-white/40"}`} />
+            <p className="text-[11px] text-white/80">
+              {agents.length === 0
+                ? "Equipa offline — responderemos em breve"
+                : `${agents.length} ${agents.length === 1 ? "agente online" : "agentes online"}`}
+            </p>
           </div>
         </div>
         {fullScreen && (
