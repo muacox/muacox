@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { FreelancersManager } from "@/components/FreelancersManager";
 import { SecurityCenter } from "@/components/SecurityCenter";
+import { DesignAIChat } from "@/components/DesignAIChat";
+import { Sparkles, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -179,10 +181,14 @@ const AdminDashboard = () => {
             <Tab value="gallery" icon={ImageIcon} label="Galeria" />
             <Tab value="testimonials" icon={Quote} label="Depoimentos" badge={testimonials.filter(t=>!t.approved).length} />
             <Tab value="team" icon={Briefcase} label="Equipa" />
+            <Tab value="design" icon={Sparkles} label="Design IA" />
+            <Tab value="security" icon={Shield} label="Segurança" />
             <Tab value="notify" icon={Bell} label="Avisos" />
           </TabsList>
 
           <TabsContent value="team"><FreelancersManager /></TabsContent>
+          <TabsContent value="design"><DesignAIChat /></TabsContent>
+          <TabsContent value="security"><SecurityCenter /></TabsContent>
 
           {/* 1. VISÃO GERAL */}
           <TabsContent value="overview" className="space-y-5">
