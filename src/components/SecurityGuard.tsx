@@ -154,6 +154,7 @@ export const SecurityGuard = () => {
       document.removeEventListener("dragstart", blockDrag);
       document.removeEventListener("copy", blockCopy);
       document.removeEventListener("keydown", blockKeys);
+      document.removeEventListener("paste", blockPaste);
       window.clearInterval(interval);
       window.clearInterval(trap);
       Object.assign(console, orig);
