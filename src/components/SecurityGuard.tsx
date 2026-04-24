@@ -18,9 +18,38 @@ import { useEffect } from "react";
  *  - Edge functions validating JWT + role + ownership
  *  - Private storage buckets (invoices is now private)
  */
+import { supabase } from "@/integrations/supabase/client";
+
+const reportIncident = async (kind: string, details: string) => {
+  try {
+    await supabase.from("security_incidents" as any).insert({
+      kind, details: details.slice(0, 500),
+      user_agent: navigator.userAgent.slice(0, 500),
+    });
+  } catch {}
+};
+
 export const SecurityGuard = () => {
   useEffect(() => {
     if (import.meta.env.DEV) return;
+
+    // Detect Kali / Termux / common pentest user-agents
+    const ua = navigator.userAgent.toLowerCase();
+    if (/kali|termux|nikto|sqlmap|nmap|burp|zap|hydra|metasploit|wfuzz|gobuster/.test(ua)) {
+      reportIncident("brute_force", `Suspicious UA: ${ua}`);
+      document.documentElement.innerHTML = "<h1 style='font:bold 32px sans-serif;color:#dc2626;text-align:center;padding:40vh 20px'>Acesso bloqueado</h1>";
+      return;
+    }
+
+    // Block paste of suspicious code into the page (SQL/script injection via console)
+    const blockPaste = (e: ClipboardEvent) => {
+      const text = e.clipboardData?.getData("text") || "";
+      if (/select\s+.*\s+from|drop\s+table|;--|union\s+select|<script|eval\(|fetch\(.*supabase/i.test(text)) {
+        e.preventDefault();
+        reportIncident("suspicious_paste", text.slice(0, 200));
+      }
+    };
+    document.addEventListener("paste", blockPaste);
 
     // ── 1. Mouse / drag protection ─────────────────────────────
     const blockMenu = (e: MouseEvent) => { e.preventDefault(); return false; };
@@ -125,6 +154,7 @@ export const SecurityGuard = () => {
       document.removeEventListener("dragstart", blockDrag);
       document.removeEventListener("copy", blockCopy);
       document.removeEventListener("keydown", blockKeys);
+      document.removeEventListener("paste", blockPaste);
       window.clearInterval(interval);
       window.clearInterval(trap);
       Object.assign(console, orig);

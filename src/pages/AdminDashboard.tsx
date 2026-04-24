@@ -4,9 +4,10 @@ import { motion } from "framer-motion";
 import {
   TrendingUp, DollarSign, Users, ShoppingBag, CheckCircle2, XCircle,
   MessageCircle, Receipt, Package, Image as ImageIcon, Bell, Plus,
-  Trash2, Edit3, Send, LayoutDashboard, FileBadge, Loader2, Download, Star, Quote, Briefcase, Link2
+  Trash2, Edit3, Send, LayoutDashboard, FileBadge, Loader2, Download, Star, Quote, Briefcase, Link2, ShieldAlert, ExternalLink
 } from "lucide-react";
 import { FreelancersManager } from "@/components/FreelancersManager";
+import { SecurityCenter } from "@/components/SecurityCenter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { ChatPanel } from "@/components/ChatPanel";
 import { formatKz } from "@/lib/site";
+import { downloadInvoice } from "@/lib/invoice";
 import { toast } from "sonner";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -272,12 +274,19 @@ const AdminDashboard = () => {
                       </div>
                       <p className="text-xs text-muted-foreground">{o.customer_email} · {o.customer_phone}</p>
                       {o.notes && <p className="text-xs mt-1 line-clamp-1 max-w-md">{o.notes}</p>}
-                      {o.invoice_url && (
-                        <a href={o.invoice_url} target="_blank" rel="noopener"
-                          className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold text-success hover:underline">
-                          <FileBadge className="h-3.5 w-3.5" />Factura {o.invoice_number}
-                          <Download className="h-3 w-3" />
-                        </a>
+                      {o.invoice_number && (
+                        <div className="inline-flex items-center gap-1.5 mt-2">
+                          <FileBadge className="h-3.5 w-3.5 text-success" />
+                          <span className="text-xs font-semibold text-success font-mono">{o.invoice_number}</span>
+                          <button onClick={() => downloadInvoice(o.invoice_number!, "view")}
+                            className="text-[11px] font-bold text-primary hover:underline ml-1">
+                            Ver
+                          </button>
+                          <button onClick={() => downloadInvoice(o.invoice_number!, "download")}
+                            className="text-[11px] font-bold text-primary hover:underline">
+                            Baixar
+                          </button>
+                        </div>
                       )}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -290,7 +299,7 @@ const AdminDashboard = () => {
                         <option value="completed">Concluído</option>
                         <option value="cancelled">Cancelado</option>
                       </select>
-                      {(o.status === "paid" || o.status === "completed") && !o.invoice_url && (
+                      {(o.status === "paid" || o.status === "completed") && !o.invoice_number && (
                         <Button size="sm" onClick={() => generateInvoice(o.id)} className="rounded-lg bg-success text-white hover:bg-success/90 h-9">
                           <FileBadge className="h-3.5 w-3.5 mr-1" />Gerar factura
                         </Button>
