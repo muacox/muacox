@@ -201,10 +201,14 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
           <img src={isaacPhoto} alt="Isaac Muaco" className="w-full h-full object-cover" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm truncate">Suporte MuacoX — Isaac Muaco</p>
+          <p className="font-bold text-sm truncate">Suporte MuacoX</p>
           <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-            <p className="text-[11px] text-white/80">{agents.length} {agents.length === 1 ? "agente online" : "agentes online"}</p>
+            <div className={`w-1.5 h-1.5 rounded-full ${agents.length > 0 ? "bg-success animate-pulse" : "bg-white/40"}`} />
+            <p className="text-[11px] text-white/80">
+              {agents.length === 0
+                ? "Equipa offline — responderemos em breve"
+                : `${agents.length} ${agents.length === 1 ? "agente online" : "agentes online"}`}
+            </p>
           </div>
         </div>
         {fullScreen && (
