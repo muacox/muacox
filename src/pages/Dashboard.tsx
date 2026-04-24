@@ -14,6 +14,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { ChatPanel, PaymentProofUpload } from "@/components/ChatPanel";
 import { ProfileSettings } from "@/components/ProfileSettings";
 import { SITE, formatKz } from "@/lib/site";
+import { downloadInvoice } from "@/lib/invoice";
 import { toast } from "sonner";
 
 interface Plan { id: string; name: string; category: string; price: number; }
@@ -123,13 +124,25 @@ const Dashboard = () => {
                         </div>
                       </div>
                       {o.notes && <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{o.notes}</p>}
-                      {o.invoice_url && (
-                        <a href={o.invoice_url} target="_blank" rel="noopener"
-                          className="flex items-center gap-2 mb-3 text-xs font-bold bg-success/10 text-success px-3 py-2.5 rounded-xl hover:bg-success/20 transition border border-success/20">
-                          <FileBadge className="h-4 w-4 shrink-0" />
-                          <span className="flex-1 truncate">Factura <span className="font-mono">{o.invoice_number || "disponível"}</span></span>
-                          <Download className="h-3.5 w-3.5 shrink-0" />
-                        </a>
+                      {o.invoice_number && (
+                        <div className="mb-3 bg-success/10 border border-success/20 rounded-xl p-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <FileBadge className="h-4 w-4 text-success shrink-0" />
+                            <span className="flex-1 text-xs font-bold text-success truncate">
+                              Factura <span className="font-mono">{o.invoice_number}</span>
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => downloadInvoice(o.invoice_number!, "view")}
+                              className="flex-1 h-9 rounded-lg">
+                              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />Ver
+                            </Button>
+                            <Button size="sm" onClick={() => downloadInvoice(o.invoice_number!, "download")}
+                              className="flex-1 h-9 rounded-lg bg-success text-white hover:bg-success/90">
+                              <Download className="h-3.5 w-3.5 mr-1.5" />Baixar
+                            </Button>
+                          </div>
+                        </div>
                       )}
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <p className="text-2xl font-display font-extrabold">{formatKz(o.amount)}</p>
