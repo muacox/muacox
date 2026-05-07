@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Paperclip, Loader2, Image as ImageIcon, X, Mic, Square, Play, Pause } from "lucide-react";
+import { Send, Paperclip, Loader2, Image as ImageIcon, X, Mic, Square, Play, Pause, Trash2, SmilePlus, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import isaacPhoto from "@/assets/isaac-muaco.webp";
 
+interface Reaction { id: string; message_id: string; user_id: string; emoji: string; }
 interface Msg {
   id: string;
   conversation_user_id: string;
@@ -16,7 +18,10 @@ interface Msg {
   attachment_url: string | null;
   attachment_kind?: string | null;
   created_at: string;
+  deleted_at?: string | null;
 }
+
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 interface OnlineAgent {
   user_id: string;
@@ -111,6 +116,8 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
     return () => { mounted = false; supabase.removeChannel(ch); clearTimeout(t); };
   }, []);
 
+  const [reactions, setReactions] = useState<Reaction[]>([]);
+
   useEffect(() => {
     let mounted = true;
     supabase.from("messages")
@@ -119,15 +126,46 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
       .order("created_at", { ascending: true })
       .then(({ data }) => { if (mounted && data) setMessages(data as Msg[]); });
 
+    const loadReactions = async () => {
+      const { data: msgs } = await supabase.from("messages").select("id").eq("conversation_user_id", conversationUserId);
+      const ids = (msgs || []).map((m: any) => m.id);
+      if (ids.length === 0) { setReactions([]); return; }
+      const { data } = await supabase.from("message_reactions").select("*").in("message_id", ids);
+      if (mounted && data) setReactions(data as Reaction[]);
+    };
+    loadReactions();
+
     const channel = supabase
       .channel(`chat-${conversationUserId}`)
       .on("postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_user_id=eq.${conversationUserId}` },
         (payload) => setMessages(prev => [...prev, payload.new as Msg]))
+      .on("postgres_changes",
+        { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_user_id=eq.${conversationUserId}` },
+        (payload) => setMessages(prev => prev.map(m => m.id === (payload.new as Msg).id ? payload.new as Msg : m)))
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "message_reactions" },
+        () => loadReactions())
       .subscribe();
 
     return () => { mounted = false; supabase.removeChannel(channel); };
   }, [conversationUserId]);
+
+  const deleteMessage = async (id: string) => {
+    if (!confirm("Eliminar esta mensagem?")) return;
+    const { error } = await supabase.from("messages").update({ deleted_at: new Date().toISOString(), body: null, attachment_url: null }).eq("id", id);
+    if (error) toast.error("Não foi possível eliminar"); else toast.success("Mensagem eliminada");
+  };
+
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    const existing = reactions.find(r => r.message_id === messageId && r.user_id === currentUserId && r.emoji === emoji);
+    if (existing) {
+      await supabase.from("message_reactions").delete().eq("id", existing.id);
+    } else {
+      const { error } = await supabase.from("message_reactions").insert({ message_id: messageId, user_id: currentUserId, emoji });
+      if (error) toast.error("Erro ao reagir");
+    }
+  };
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -291,27 +329,97 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
           {messages.map(m => {
             const mine = m.sender_id === currentUserId;
             const isAudio = m.attachment_kind === "audio" || (m.attachment_url || "").match(/\.(webm|m4a|mp3|ogg|wav)/i);
+            const deleted = !!m.deleted_at;
+            const msgReactions = reactions.filter(r => r.message_id === m.id);
+            // Group by emoji
+            const grouped: Record<string, Reaction[]> = {};
+            msgReactions.forEach(r => { (grouped[r.emoji] ||= []).push(r); });
             return (
               <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
-                  mine ? "bg-gradient-blue text-white rounded-br-sm" : "bg-secondary text-foreground rounded-bl-sm"
-                }`}>
-                  {!mine && m.is_admin_sender && (
-                    <p className="text-xs font-bold opacity-70 mb-1">Equipa MuacoX</p>
+                className={`flex ${mine ? "justify-end" : "justify-start"} group`}>
+                <div className={`relative max-w-[80%] ${mine ? "items-end" : "items-start"} flex flex-col`}>
+                  <div className={`flex items-end gap-1 ${mine ? "flex-row-reverse" : ""}`}>
+                    <div className={`rounded-2xl px-4 py-2.5 text-sm ${
+                      deleted
+                        ? "bg-muted text-muted-foreground italic"
+                        : mine ? "bg-gradient-blue text-white rounded-br-sm" : "bg-secondary text-foreground rounded-bl-sm"
+                    }`}>
+                      {!mine && m.is_admin_sender && !deleted && (
+                        <p className="text-xs font-bold opacity-70 mb-1">Equipa MuacoX</p>
+                      )}
+                      {deleted ? (
+                        <p>Mensagem eliminada</p>
+                      ) : (
+                        <>
+                          {m.attachment_url && isAudio && (
+                            <audio controls src={m.attachment_url} className="max-w-[240px] mb-1" preload="metadata" />
+                          )}
+                          {m.attachment_url && !isAudio && (
+                            <a href={m.attachment_url} target="_blank" rel="noopener" className="block mb-1">
+                              <img src={m.attachment_url} alt="anexo" className="rounded-xl max-h-60 object-cover" />
+                            </a>
+                          )}
+                          {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
+                        </>
+                      )}
+                      <p className={`text-[10px] mt-1 ${mine ? "text-white/60" : "text-muted-foreground"}`}>
+                        {new Date(m.created_at).toLocaleTimeString("pt-AO", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                    {!deleted && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 focus:opacity-100 md:opacity-0 transition w-7 h-7 rounded-full bg-background border border-border flex items-center justify-center shrink-0 active:scale-95"
+                            aria-label="Acções"
+                          >
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-2 rounded-2xl" align={mine ? "end" : "start"}>
+                          <div className="flex items-center gap-1">
+                            {REACTION_EMOJIS.map(e => (
+                              <button
+                                key={e}
+                                onClick={() => toggleReaction(m.id, e)}
+                                className="w-9 h-9 rounded-full hover:bg-secondary text-lg flex items-center justify-center transition"
+                              >
+                                {e}
+                              </button>
+                            ))}
+                            {(mine || isAdmin) && (
+                              <button
+                                onClick={() => deleteMessage(m.id)}
+                                className="w-9 h-9 rounded-full hover:bg-destructive/10 text-destructive flex items-center justify-center transition ml-1 border-l border-border pl-2"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
+                  {Object.keys(grouped).length > 0 && (
+                    <div className={`flex flex-wrap gap-1 mt-1 ${mine ? "justify-end" : "justify-start"}`}>
+                      {Object.entries(grouped).map(([emoji, list]) => {
+                        const reactedByMe = list.some(r => r.user_id === currentUserId);
+                        return (
+                          <button
+                            key={emoji}
+                            onClick={() => toggleReaction(m.id, emoji)}
+                            className={`text-xs px-2 py-0.5 rounded-full border flex items-center gap-1 transition ${
+                              reactedByMe ? "bg-primary/15 border-primary/40" : "bg-background border-border hover:bg-secondary"
+                            }`}
+                          >
+                            <span>{emoji}</span>
+                            <span className="font-semibold">{list.length}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
-                  {m.attachment_url && isAudio && (
-                    <audio controls src={m.attachment_url} className="max-w-[240px] mb-1" preload="metadata" />
-                  )}
-                  {m.attachment_url && !isAudio && (
-                    <a href={m.attachment_url} target="_blank" rel="noopener" className="block mb-1">
-                      <img src={m.attachment_url} alt="anexo" className="rounded-xl max-h-60 object-cover" />
-                    </a>
-                  )}
-                  {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
-                  <p className={`text-[10px] mt-1 ${mine ? "text-white/60" : "text-muted-foreground"}`}>
-                    {new Date(m.created_at).toLocaleTimeString("pt-AO", { hour: "2-digit", minute: "2-digit" })}
-                  </p>
                 </div>
               </motion.div>
             );
