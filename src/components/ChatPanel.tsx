@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Paperclip, Loader2, Image as ImageIcon, X, Mic, Square, Play, Pause } from "lucide-react";
+import { Send, Paperclip, Loader2, Image as ImageIcon, X, Mic, Square, Play, Pause, Trash2, SmilePlus, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import isaacPhoto from "@/assets/isaac-muaco.webp";
 
+interface Reaction { id: string; message_id: string; user_id: string; emoji: string; }
 interface Msg {
   id: string;
   conversation_user_id: string;
@@ -16,7 +18,10 @@ interface Msg {
   attachment_url: string | null;
   attachment_kind?: string | null;
   created_at: string;
+  deleted_at?: string | null;
 }
+
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 interface OnlineAgent {
   user_id: string;
