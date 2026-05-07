@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import isaacPhoto from "@/assets/isaac-muaco.jpg";
+import isaacPhoto from "@/assets/isaac-muaco.webp";
 
 interface Msg {
   id: string;
@@ -48,39 +48,58 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
   useEffect(() => {
     let mounted = true;
     const loadAgents = async () => {
+      // 1. Online freelancers
       const { data: online } = await supabase
         .from("freelancers")
         .select("user_id, full_name, avatar_url, status, is_online")
         .eq("status", "active")
         .eq("is_online", true);
 
-      const userIds = (online || []).map((f: any) => f.user_id).filter(Boolean);
-      let adminIds = new Set<string>();
-      if (userIds.length) {
-        const { data: roles } = await supabase
-          .from("user_roles")
-          .select("user_id, role")
-          .in("user_id", userIds)
-          .eq("role", "admin");
-        adminIds = new Set((roles || []).map((r: any) => r.user_id));
+      // 2. Admins (always shown as available — Isaac é o suporte principal)
+      const { data: adminRoles } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin");
+      const adminIds = new Set((adminRoles || []).map((r: any) => r.user_id));
+
+      // 3. Profiles for admins (so we have name/avatar)
+      let adminProfiles: any[] = [];
+      if (adminIds.size > 0) {
+        const { data } = await supabase.functions.invoke("public-avatars");
+        adminProfiles = ((data as any)?.avatars || []).filter((p: any) => adminIds.has(p.user_id));
       }
 
       if (!mounted) return;
       const seen = new Set<string>();
       const list: OnlineAgent[] = [];
-      for (const f of online || []) {
-        if (!f.user_id || seen.has(f.user_id)) continue;
-        seen.add(f.user_id);
-        const isAdminAgent = adminIds.has(f.user_id);
+
+      // Add admins first (always visible)
+      for (const a of adminProfiles) {
+        if (seen.has(a.user_id)) continue;
+        seen.add(a.user_id);
         list.push({
-          user_id: f.user_id,
-          full_name: f.full_name || (isAdminAgent ? "Admin" : "Freelancer"),
-          avatar_url: f.avatar_url || (isAdminAgent ? isaacPhoto : null),
-          role: isAdminAgent ? "admin" : "freelancer",
+          user_id: a.user_id,
+          full_name: a.full_name || "Isaac Muaco",
+          avatar_url: a.avatar_url || isaacPhoto,
+          role: "admin",
         });
       }
-      // Admins first
-      list.sort((a, b) => (a.role === b.role ? 0 : a.role === "admin" ? -1 : 1));
+      // Fallback: if no admin profile loaded but role exists, show Isaac card
+      if (list.length === 0 && adminIds.size > 0) {
+        list.push({ user_id: Array.from(adminIds)[0]!, full_name: "Isaac Muaco", avatar_url: isaacPhoto, role: "admin" });
+      }
+
+      // Add online freelancers (skip duplicates of admin)
+      for (const f of online || []) {
+        if (!f.user_id || seen.has(f.user_id) || adminIds.has(f.user_id)) continue;
+        seen.add(f.user_id);
+        list.push({
+          user_id: f.user_id,
+          full_name: f.full_name || "Freelancer",
+          avatar_url: f.avatar_url,
+          role: "freelancer",
+        });
+      }
       setAgents(list);
     };
     loadAgents();
@@ -88,7 +107,7 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
       .channel("freelancers-presence")
       .on("postgres_changes", { event: "*", schema: "public", table: "freelancers" }, loadAgents)
       .subscribe();
-    const t = setTimeout(() => setShowWelcome(false), 4500);
+    const t = setTimeout(() => setShowWelcome(false), 5000);
     return () => { mounted = false; supabase.removeChannel(ch); clearTimeout(t); };
   }, []);
 

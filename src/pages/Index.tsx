@@ -13,12 +13,12 @@ import { SITE, formatKz } from "@/lib/site";
 import { AuthAvatarStrip } from "@/components/AuthAvatarStrip";
 import { TestimonialsSection } from "@/components/TestimonialsSection";
 import logo from "@/assets/muacox-logo.png";
-import isaacPhoto from "@/assets/isaac-muaco.jpg";
-import flyer1 from "@/assets/flyers/flyer-marketing.png";
-import flyer2 from "@/assets/flyers/flyer-freddy.png";
-import flyer3 from "@/assets/flyers/flyer-programador.png";
-import flyer4 from "@/assets/flyers/flyer-konsola.png";
-import flyer5 from "@/assets/flyers/flyer-voto.png";
+import isaacPhoto from "@/assets/isaac-muaco.webp";
+import flyer1 from "@/assets/flyers/flyer-marketing.webp";
+import flyer2 from "@/assets/flyers/flyer-freddy.webp";
+import flyer3 from "@/assets/flyers/flyer-programador.webp";
+import flyer4 from "@/assets/flyers/flyer-konsola.webp";
+import flyer5 from "@/assets/flyers/flyer-voto.webp";
 
 interface Plan {
   id: string; category: string; name: string; description: string;
