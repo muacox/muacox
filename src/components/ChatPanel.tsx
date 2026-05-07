@@ -116,6 +116,8 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
     return () => { mounted = false; supabase.removeChannel(ch); clearTimeout(t); };
   }, []);
 
+  const [reactions, setReactions] = useState<Reaction[]>([]);
+
   useEffect(() => {
     let mounted = true;
     supabase.from("messages")
@@ -124,15 +126,46 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
       .order("created_at", { ascending: true })
       .then(({ data }) => { if (mounted && data) setMessages(data as Msg[]); });
 
+    const loadReactions = async () => {
+      const { data: msgs } = await supabase.from("messages").select("id").eq("conversation_user_id", conversationUserId);
+      const ids = (msgs || []).map((m: any) => m.id);
+      if (ids.length === 0) { setReactions([]); return; }
+      const { data } = await supabase.from("message_reactions").select("*").in("message_id", ids);
+      if (mounted && data) setReactions(data as Reaction[]);
+    };
+    loadReactions();
+
     const channel = supabase
       .channel(`chat-${conversationUserId}`)
       .on("postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_user_id=eq.${conversationUserId}` },
         (payload) => setMessages(prev => [...prev, payload.new as Msg]))
+      .on("postgres_changes",
+        { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_user_id=eq.${conversationUserId}` },
+        (payload) => setMessages(prev => prev.map(m => m.id === (payload.new as Msg).id ? payload.new as Msg : m)))
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "message_reactions" },
+        () => loadReactions())
       .subscribe();
 
     return () => { mounted = false; supabase.removeChannel(channel); };
   }, [conversationUserId]);
+
+  const deleteMessage = async (id: string) => {
+    if (!confirm("Eliminar esta mensagem?")) return;
+    const { error } = await supabase.from("messages").update({ deleted_at: new Date().toISOString(), body: null, attachment_url: null }).eq("id", id);
+    if (error) toast.error("Não foi possível eliminar"); else toast.success("Mensagem eliminada");
+  };
+
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    const existing = reactions.find(r => r.message_id === messageId && r.user_id === currentUserId && r.emoji === emoji);
+    if (existing) {
+      await supabase.from("message_reactions").delete().eq("id", existing.id);
+    } else {
+      const { error } = await supabase.from("message_reactions").insert({ message_id: messageId, user_id: currentUserId, emoji });
+      if (error) toast.error("Erro ao reagir");
+    }
+  };
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
