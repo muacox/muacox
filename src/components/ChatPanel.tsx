@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import isaacPhoto from "@/assets/isaac-muaco.jpg";
+import isaacPhoto from "@/assets/isaac-muaco.webp";
 
 interface Msg {
   id: string;
