@@ -329,27 +329,97 @@ export const ChatPanel = ({ conversationUserId, currentUserId, isAdmin, fullScre
           {messages.map(m => {
             const mine = m.sender_id === currentUserId;
             const isAudio = m.attachment_kind === "audio" || (m.attachment_url || "").match(/\.(webm|m4a|mp3|ogg|wav)/i);
+            const deleted = !!m.deleted_at;
+            const msgReactions = reactions.filter(r => r.message_id === m.id);
+            // Group by emoji
+            const grouped: Record<string, Reaction[]> = {};
+            msgReactions.forEach(r => { (grouped[r.emoji] ||= []).push(r); });
             return (
               <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
-                  mine ? "bg-gradient-blue text-white rounded-br-sm" : "bg-secondary text-foreground rounded-bl-sm"
-                }`}>
-                  {!mine && m.is_admin_sender && (
-                    <p className="text-xs font-bold opacity-70 mb-1">Equipa MuacoX</p>
+                className={`flex ${mine ? "justify-end" : "justify-start"} group`}>
+                <div className={`relative max-w-[80%] ${mine ? "items-end" : "items-start"} flex flex-col`}>
+                  <div className={`flex items-end gap-1 ${mine ? "flex-row-reverse" : ""}`}>
+                    <div className={`rounded-2xl px-4 py-2.5 text-sm ${
+                      deleted
+                        ? "bg-muted text-muted-foreground italic"
+                        : mine ? "bg-gradient-blue text-white rounded-br-sm" : "bg-secondary text-foreground rounded-bl-sm"
+                    }`}>
+                      {!mine && m.is_admin_sender && !deleted && (
+                        <p className="text-xs font-bold opacity-70 mb-1">Equipa MuacoX</p>
+                      )}
+                      {deleted ? (
+                        <p>Mensagem eliminada</p>
+                      ) : (
+                        <>
+                          {m.attachment_url && isAudio && (
+                            <audio controls src={m.attachment_url} className="max-w-[240px] mb-1" preload="metadata" />
+                          )}
+                          {m.attachment_url && !isAudio && (
+                            <a href={m.attachment_url} target="_blank" rel="noopener" className="block mb-1">
+                              <img src={m.attachment_url} alt="anexo" className="rounded-xl max-h-60 object-cover" />
+                            </a>
+                          )}
+                          {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
+                        </>
+                      )}
+                      <p className={`text-[10px] mt-1 ${mine ? "text-white/60" : "text-muted-foreground"}`}>
+                        {new Date(m.created_at).toLocaleTimeString("pt-AO", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                    {!deleted && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 focus:opacity-100 md:opacity-0 transition w-7 h-7 rounded-full bg-background border border-border flex items-center justify-center shrink-0 active:scale-95"
+                            aria-label="Acções"
+                          >
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-2 rounded-2xl" align={mine ? "end" : "start"}>
+                          <div className="flex items-center gap-1">
+                            {REACTION_EMOJIS.map(e => (
+                              <button
+                                key={e}
+                                onClick={() => toggleReaction(m.id, e)}
+                                className="w-9 h-9 rounded-full hover:bg-secondary text-lg flex items-center justify-center transition"
+                              >
+                                {e}
+                              </button>
+                            ))}
+                            {(mine || isAdmin) && (
+                              <button
+                                onClick={() => deleteMessage(m.id)}
+                                className="w-9 h-9 rounded-full hover:bg-destructive/10 text-destructive flex items-center justify-center transition ml-1 border-l border-border pl-2"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
+                  {Object.keys(grouped).length > 0 && (
+                    <div className={`flex flex-wrap gap-1 mt-1 ${mine ? "justify-end" : "justify-start"}`}>
+                      {Object.entries(grouped).map(([emoji, list]) => {
+                        const reactedByMe = list.some(r => r.user_id === currentUserId);
+                        return (
+                          <button
+                            key={emoji}
+                            onClick={() => toggleReaction(m.id, emoji)}
+                            className={`text-xs px-2 py-0.5 rounded-full border flex items-center gap-1 transition ${
+                              reactedByMe ? "bg-primary/15 border-primary/40" : "bg-background border-border hover:bg-secondary"
+                            }`}
+                          >
+                            <span>{emoji}</span>
+                            <span className="font-semibold">{list.length}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
-                  {m.attachment_url && isAudio && (
-                    <audio controls src={m.attachment_url} className="max-w-[240px] mb-1" preload="metadata" />
-                  )}
-                  {m.attachment_url && !isAudio && (
-                    <a href={m.attachment_url} target="_blank" rel="noopener" className="block mb-1">
-                      <img src={m.attachment_url} alt="anexo" className="rounded-xl max-h-60 object-cover" />
-                    </a>
-                  )}
-                  {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
-                  <p className={`text-[10px] mt-1 ${mine ? "text-white/60" : "text-muted-foreground"}`}>
-                    {new Date(m.created_at).toLocaleTimeString("pt-AO", { hour: "2-digit", minute: "2-digit" })}
-                  </p>
                 </div>
               </motion.div>
             );
