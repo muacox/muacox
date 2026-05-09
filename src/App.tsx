@@ -12,6 +12,8 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import FreelancerDashboard from "./pages/FreelancerDashboard";
+import Marketplace from "./pages/Marketplace";
+import MarketplaceProject from "./pages/MarketplaceProject";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +33,8 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/cadastro" element={<Register />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/marketplace/:slug" element={<MarketplaceProject />} />
             {/* Rota admin oculta — só acessível por link directo + verificação isAdmin */}
             <Route path="/mx-control-9f3a2b" element={<AdminDashboard />} />
             <Route path="/freelancer" element={<FreelancerDashboard />} />

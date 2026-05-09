@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.download-invoice]
 verify_jwt = false
+
+[functions.freelancer-download]
+verify_jwt = false
+
+[functions.freelancer-checkout]
+verify_jwt = false

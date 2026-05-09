@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { MessageCircle, ShoppingBag, Users, Receipt, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { MessageCircle, ShoppingBag, Users, Receipt, CheckCircle2, XCircle, Clock, Code2, Briefcase, DollarSign } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,6 +9,9 @@ import { useFreelancerPresence } from "@/hooks/useFreelancerPresence";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { ChatPanel } from "@/components/ChatPanel";
+import { ProjectsManager } from "@/components/freelancer/ProjectsManager";
+import { SalesManager } from "@/components/freelancer/SalesManager";
+import { ContractsManager } from "@/components/freelancer/ContractsManager";
 import { formatKz } from "@/lib/site";
 import { toast } from "sonner";
 
@@ -20,6 +23,7 @@ const FreelancerDashboard = () => {
   const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
   const [isFreelancer, setIsFreelancer] = useState<boolean | null>(null);
+  const [freelancerId, setFreelancerId] = useState<string | null>(null);
   const [convs, setConvs] = useState<Conv[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [proofs, setProofs] = useState<Proof[]>([]);
@@ -34,8 +38,8 @@ const FreelancerDashboard = () => {
   useEffect(() => {
     if (!user) return;
     supabase.from("freelancers")
-      .select("status").eq("user_id", user.id).maybeSingle()
-      .then(({ data }) => setIsFreelancer(data?.status === "active"));
+      .select("id,status").eq("user_id", user.id).maybeSingle()
+      .then(({ data }) => { setIsFreelancer(data?.status === "active"); setFreelancerId(data?.id || null); });
   }, [user]);
 
   useEffect(() => {
@@ -113,10 +117,13 @@ const FreelancerDashboard = () => {
         </motion.div>
 
         <Tabs defaultValue="chat" className="space-y-4">
-          <TabsList className="rounded-2xl h-12 p-1.5 bg-secondary grid grid-cols-3 md:w-auto md:inline-grid">
-            <TabsTrigger value="chat" className="rounded-xl"><MessageCircle className="h-4 w-4 mr-1.5" />Chats ({convs.length})</TabsTrigger>
-            <TabsTrigger value="orders" className="rounded-xl"><ShoppingBag className="h-4 w-4 mr-1.5" />Pedidos ({orders.length})</TabsTrigger>
-            <TabsTrigger value="proofs" className="rounded-xl"><Receipt className="h-4 w-4 mr-1.5" />Pagamentos</TabsTrigger>
+          <TabsList className="rounded-2xl h-auto p-1.5 bg-secondary flex flex-wrap gap-1">
+            <TabsTrigger value="chat" className="rounded-xl"><MessageCircle className="h-4 w-4 mr-1.5" />Chats</TabsTrigger>
+            <TabsTrigger value="orders" className="rounded-xl"><ShoppingBag className="h-4 w-4 mr-1.5" />Pedidos</TabsTrigger>
+            <TabsTrigger value="proofs" className="rounded-xl"><Receipt className="h-4 w-4 mr-1.5" />Comprovativos</TabsTrigger>
+            <TabsTrigger value="projects" className="rounded-xl"><Code2 className="h-4 w-4 mr-1.5" />Projectos</TabsTrigger>
+            <TabsTrigger value="sales" className="rounded-xl"><DollarSign className="h-4 w-4 mr-1.5" />Vendas</TabsTrigger>
+            <TabsTrigger value="contracts" className="rounded-xl"><Briefcase className="h-4 w-4 mr-1.5" />Contratos</TabsTrigger>
           </TabsList>
 
           <TabsContent value="chat">
@@ -192,6 +199,15 @@ const FreelancerDashboard = () => {
               ))}
               {proofs.length === 0 && <p className="text-center text-muted-foreground py-10 col-span-full">Sem comprovativos.</p>}
             </div>
+          </TabsContent>
+          <TabsContent value="projects">
+            {freelancerId && user && <ProjectsManager freelancerId={freelancerId} userId={user.id} />}
+          </TabsContent>
+          <TabsContent value="sales">
+            {freelancerId && <SalesManager freelancerId={freelancerId} />}
+          </TabsContent>
+          <TabsContent value="contracts">
+            {freelancerId && <ContractsManager freelancerId={freelancerId} />}
           </TabsContent>
         </Tabs>
       </div>
