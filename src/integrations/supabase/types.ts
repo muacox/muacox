@@ -74,6 +74,194 @@ export type Database = {
         }
         Relationships: []
       }
+      freelancer_contracts: {
+        Row: {
+          budget: number | null
+          client_email: string
+          client_iban: string | null
+          client_name: string
+          client_phone: string
+          client_user_id: string | null
+          created_at: string
+          deadline_days: number | null
+          freelancer_id: string
+          freelancer_response: string | null
+          id: string
+          project_description: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          budget?: number | null
+          client_email: string
+          client_iban?: string | null
+          client_name: string
+          client_phone: string
+          client_user_id?: string | null
+          created_at?: string
+          deadline_days?: number | null
+          freelancer_id: string
+          freelancer_response?: string | null
+          id?: string
+          project_description: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          budget?: number | null
+          client_email?: string
+          client_iban?: string | null
+          client_name?: string
+          client_phone?: string
+          client_user_id?: string | null
+          created_at?: string
+          deadline_days?: number | null
+          freelancer_id?: string
+          freelancer_response?: string | null
+          id?: string
+          project_description?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      freelancer_projects: {
+        Row: {
+          active: boolean
+          category: string | null
+          cover_url: string | null
+          created_at: string
+          currency: string
+          demo_url: string | null
+          description: string | null
+          features: Json | null
+          files_path: string | null
+          freelancer_id: string
+          id: string
+          language: string | null
+          price: number
+          sales_count: number
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category?: string | null
+          cover_url?: string | null
+          created_at?: string
+          currency?: string
+          demo_url?: string | null
+          description?: string | null
+          features?: Json | null
+          files_path?: string | null
+          freelancer_id: string
+          id?: string
+          language?: string | null
+          price: number
+          sales_count?: number
+          slug: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string | null
+          cover_url?: string | null
+          created_at?: string
+          currency?: string
+          demo_url?: string | null
+          description?: string | null
+          features?: Json | null
+          files_path?: string | null
+          freelancer_id?: string
+          id?: string
+          language?: string | null
+          price?: number
+          sales_count?: number
+          slug?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      freelancer_purchases: {
+        Row: {
+          amount: number
+          buyer_email: string
+          buyer_iban: string | null
+          buyer_name: string | null
+          buyer_phone: string
+          buyer_user_id: string | null
+          created_at: string
+          currency: string
+          download_expires_at: string | null
+          download_token: string | null
+          freelancer_id: string
+          freelancer_payout: number
+          id: string
+          paid_at: string | null
+          payment_reference: string | null
+          platform_fee: number
+          project_id: string
+          proof_url: string | null
+          released_at: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          buyer_email: string
+          buyer_iban?: string | null
+          buyer_name?: string | null
+          buyer_phone: string
+          buyer_user_id?: string | null
+          created_at?: string
+          currency?: string
+          download_expires_at?: string | null
+          download_token?: string | null
+          freelancer_id: string
+          freelancer_payout: number
+          id?: string
+          paid_at?: string | null
+          payment_reference?: string | null
+          platform_fee: number
+          project_id: string
+          proof_url?: string | null
+          released_at?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          buyer_email?: string
+          buyer_iban?: string | null
+          buyer_name?: string | null
+          buyer_phone?: string
+          buyer_user_id?: string | null
+          created_at?: string
+          currency?: string
+          download_expires_at?: string | null
+          download_token?: string | null
+          freelancer_id?: string
+          freelancer_payout?: number
+          id?: string
+          paid_at?: string | null
+          payment_reference?: string | null
+          platform_fee?: number
+          project_id?: string
+          proof_url?: string | null
+          released_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "freelancer_purchases_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "freelancer_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       freelancers: {
         Row: {
           accepted_at: string | null
