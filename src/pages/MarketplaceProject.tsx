@@ -119,15 +119,15 @@ const MarketplaceProject = () => {
 };
 
 const CheckoutModal = ({ open, setOpen, project, user, profile }: any) => {
-  const [step, setStep] = useState<"form" | "pay" | "proof">("form");
+  const [step, setStep] = useState<"form" | "waiting" | "success" | "failed">("form");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [iban, setIban] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [purchase, setPurchase] = useState<any>(null);
-  const [paymentInfo, setPaymentInfo] = useState<any>(null);
-  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [reference, setReference] = useState<string | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
     if (open && user) {
@@ -135,88 +135,130 @@ const CheckoutModal = ({ open, setOpen, project, user, profile }: any) => {
       setName(profile?.full_name || "");
       setPhone(profile?.phone || "");
     }
+    if (!open) {
+      setStep("form"); setReference(null); setDownloadUrl(null); setErrorMsg("");
+    }
   }, [open, user, profile]);
+
+  // Polling automático enquanto aguarda confirmação do MCX Express
+  useEffect(() => {
+    if (step !== "waiting" || !reference) return;
+    let attempts = 0;
+    const max = 60; // ~3 minutos a 3s
+    const id = setInterval(async () => {
+      attempts++;
+      try {
+        const r = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/freelancer-payment-status?reference=${encodeURIComponent(reference)}`,
+          { headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } }
+        );
+        const data = await r.json();
+        if (data.status === "paid") {
+          clearInterval(id);
+          setDownloadUrl(data.download_url);
+          setStep("success");
+          toast.success("Pagamento confirmado!");
+        } else if (data.status === "failed") {
+          clearInterval(id);
+          setErrorMsg("Pagamento falhou ou foi cancelado.");
+          setStep("failed");
+        } else if (attempts >= max) {
+          clearInterval(id);
+          setErrorMsg("Tempo esgotado. Se já pagaste, recarrega esta página em breve.");
+          setStep("failed");
+        }
+      } catch {/* ignore */}
+    }, 3000);
+    return () => clearInterval(id);
+  }, [step, reference]);
 
   const submitForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBusy(true);
+    setBusy(true); setErrorMsg("");
     try {
       const { data, error } = await supabase.functions.invoke("freelancer-checkout", {
         body: { project_id: project.id, buyer_email: email, buyer_phone: phone, buyer_iban: iban, buyer_name: name },
       });
       if (error) throw new Error(error.message);
       if ((data as any)?.error) throw new Error((data as any).error);
-      setPurchase((data as any).purchase);
-      setPaymentInfo((data as any).payment);
-      setStep("pay");
+      setReference((data as any).payment.reference);
+      setStep("waiting");
+      toast.success("Push enviado! Confirma na app Multicaixa Express.");
     } catch (e: any) {
       toast.error(e.message || "Erro");
+      setErrorMsg(e.message || "Erro");
     } finally { setBusy(false); }
   };
-
-  const uploadProof = async () => {
-    if (!proofFile || !purchase) return;
-    setBusy(true);
-    try {
-      const path = `${user?.id || "guest"}/${purchase.id}-${Date.now()}-${proofFile.name}`;
-      const { error: upErr } = await supabase.storage.from("chat-uploads").upload(path, proofFile, { upsert: true });
-      if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from("chat-uploads").getPublicUrl(path);
-      const { error: updErr } = await supabase.from("freelancer_purchases").update({
-        proof_url: pub.publicUrl, status: "proof_uploaded",
-      }).eq("id", purchase.id);
-      if (updErr) throw updErr;
-      toast.success("Comprovativo enviado! Aguarda confirmação do freelancer.");
-      setOpen(false);
-      setStep("form"); setProofFile(null);
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally { setBusy(false); }
-  };
-
-  const copy = (t: string) => { navigator.clipboard.writeText(t); toast.success("Copiado"); };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>{step === "form" ? "Comprar projecto" : step === "pay" ? "Pagar via PlinqPay" : "Enviar comprovativo"}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>
+            {step === "form" && "Pagar com Multicaixa Express"}
+            {step === "waiting" && "A aguardar confirmação"}
+            {step === "success" && "Pagamento confirmado"}
+            {step === "failed" && "Pagamento não confirmado"}
+          </DialogTitle>
+        </DialogHeader>
 
         {step === "form" && (
           <form onSubmit={submitForm} className="space-y-3">
             <div><Label>Nome</Label><Input value={name} onChange={e => setName(e.target.value)} required className="rounded-xl h-11" /></div>
             <div><Label>Email</Label><Input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="rounded-xl h-11" /></div>
-            <div><Label>Telefone</Label><Input value={phone} onChange={e => setPhone(e.target.value)} required placeholder="9XX XXX XXX" className="rounded-xl h-11" /></div>
+            <div>
+              <Label>Telefone Multicaixa Express</Label>
+              <Input value={phone} onChange={e => setPhone(e.target.value)} required placeholder="9XXXXXXXX" maxLength={9} className="rounded-xl h-11" />
+              <p className="text-[11px] text-muted-foreground mt-1">9 dígitos. Receberás o pedido na app MCX Express.</p>
+            </div>
             <div><Label>IBAN (opcional)</Label><Input value={iban} onChange={e => setIban(e.target.value)} placeholder="AO06..." className="rounded-xl h-11" /></div>
             <div className="bg-secondary rounded-xl p-3 text-sm flex justify-between"><span>Total</span><span className="font-bold">{formatKz(project.price)}</span></div>
             <Button type="submit" disabled={busy} className="w-full h-12 rounded-xl bg-gradient-blue text-white font-bold">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Continuar para pagamento"}
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Pagar agora"}
             </Button>
           </form>
         )}
 
-        {step === "pay" && paymentInfo && (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Faz o pagamento via Multicaixa Express ou ATM com estes dados:</p>
-            <div className="space-y-2">
-              {[["Entidade", paymentInfo.entity], ["Referência", paymentInfo.reference], ["Valor", formatKz(paymentInfo.amount)]].map(([l, v]) => (
-                <button key={l} onClick={() => copy(String(v))} className="w-full bg-secondary rounded-xl p-3 flex justify-between items-center hover:bg-secondary/70">
-                  <div className="text-left"><p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">{l}</p><p className="font-mono font-bold">{v}</p></div>
-                  <Copy className="h-4 w-4 text-muted-foreground" />
-                </button>
-              ))}
+        {step === "waiting" && (
+          <div className="py-6 text-center space-y-4">
+            <div className="mx-auto w-16 h-16 rounded-full bg-primary/15 flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-            <Button onClick={() => setStep("proof")} className="w-full h-12 rounded-xl bg-foreground text-background font-bold">Já paguei — enviar comprovativo</Button>
+            <div>
+              <p className="font-bold">Confirma na tua app Multicaixa Express</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Pedido enviado para <span className="font-mono font-bold">{phone}</span>.
+                Aceita o pagamento de <span className="font-bold">{formatKz(project.price)}</span> na app.
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">A verificar automaticamente…</p>
           </div>
         )}
 
-        {step === "proof" && (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Envia uma foto/captura do comprovativo. O freelancer confirmará e libertará o download.</p>
-            <input type="file" accept="image/*,.pdf" onChange={e => setProofFile(e.target.files?.[0] || null)} className="w-full text-sm" />
-            {proofFile && <p className="text-xs text-success">✓ {proofFile.name}</p>}
-            <Button onClick={uploadProof} disabled={!proofFile || busy} className="w-full h-12 rounded-xl bg-gradient-blue text-white font-bold">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Upload className="h-4 w-4 mr-2" />Enviar</>}
-            </Button>
+        {step === "success" && (
+          <div className="py-6 text-center space-y-4">
+            <div className="mx-auto w-16 h-16 rounded-full bg-success/15 flex items-center justify-center">
+              <Check className="h-8 w-8 text-success" />
+            </div>
+            <div>
+              <p className="font-bold">Pagamento recebido!</p>
+              <p className="text-sm text-muted-foreground mt-1">O download do projecto está pronto.</p>
+            </div>
+            {downloadUrl && (
+              <a href={downloadUrl} target="_blank" rel="noopener">
+                <Button className="w-full h-12 rounded-xl bg-gradient-blue text-white font-bold">
+                  Descarregar ficheiros
+                </Button>
+              </a>
+            )}
+            <p className="text-[11px] text-muted-foreground">Link válido por 14 dias.</p>
+          </div>
+        )}
+
+        {step === "failed" && (
+          <div className="py-6 text-center space-y-4">
+            <p className="text-sm text-destructive">{errorMsg}</p>
+            <Button onClick={() => setStep("form")} variant="outline" className="w-full h-12 rounded-xl">Tentar novamente</Button>
           </div>
         )}
       </DialogContent>
