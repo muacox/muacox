@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.freelancer-checkout]
 verify_jwt = false
+
+[functions.freelancer-payment-webhook]
+verify_jwt = false
+
+[functions.freelancer-payment-status]
+verify_jwt = false
