@@ -44,7 +44,7 @@ const MarketplaceProject = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 bg-background/85 backdrop-blur-xl border-b border-border">
+      <header className="sticky top-0 z-30 bg-background border-b border-border">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Link to="/marketplace"><Button variant="ghost" size="icon" className="rounded-full"><ArrowLeft className="h-5 w-5" /></Button></Link>
           <p className="font-bold truncate">{project.title}</p>

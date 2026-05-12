@@ -386,7 +386,7 @@ const PlanCard = ({ plan, cycleLabel }: { plan: Plan; cycleLabel: string }) => (
 );
 
 const ContactCard = ({ icon: Icon, label, value, href }: any) => (
-  <a href={href} className="group bg-background/5 hover:bg-background/10 backdrop-blur border border-background/10 rounded-2xl p-5 flex items-center gap-4 transition">
+  <a href={href} className="group bg-background/5 hover:bg-background/10  border border-background/10 rounded-2xl p-5 flex items-center gap-4 transition">
     <div className="w-12 h-12 rounded-xl bg-gradient-blue flex items-center justify-center shrink-0 group-hover:scale-110 transition">
       <Icon className="h-5 w-5 text-white" />
     </div>

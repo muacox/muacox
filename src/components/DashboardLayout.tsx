@@ -69,7 +69,7 @@ export const DashboardLayout = ({ children, admin }: Props) => {
       </aside>
 
       {/* Mobile top bar */}
-      <header className="md:hidden sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border px-4 h-14 flex items-center justify-between">
+      <header className="md:hidden sticky top-0 z-40 bg-background border-b border-border px-4 h-14 flex items-center justify-between">
         <Link to="/"><img src={logo} alt="MuacoX" className="h-12 w-auto" /></Link>
         <div className="flex items-center gap-2">
           {isAdmin && !admin && (
