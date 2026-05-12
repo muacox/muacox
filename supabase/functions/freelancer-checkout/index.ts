@@ -64,7 +64,7 @@ Deno.serve(async (req: Request) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const platform_fee = Math.round(amount * 0.15 * 100) / 100;
+    const platform_fee = Math.round(amount * 0.07 * 100) / 100;
     const freelancer_payout = Math.round((amount - platform_fee) * 100) / 100;
     const reference = `MX${Date.now().toString().slice(-7)}${Math.floor(Math.random() * 99)}`;
 

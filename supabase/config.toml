@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.freelancer-payment-status]
 verify_jwt = false
+
+[functions.plan-checkout]
+verify_jwt = false
+
+[functions.freelancer-subscribe]
+verify_jwt = false
