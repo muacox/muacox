@@ -1,31 +1,34 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, MessageCircle, FileText, LogOut, Shield, Home } from "lucide-react";
+import { LayoutDashboard, LogOut, Shield, Home, Headphones } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/muacox-logo.png";
 
 interface Props { children: ReactNode; admin?: boolean; }
 
 export const DashboardLayout = ({ children, admin }: Props) => {
-  const { signOut, profile, isAdmin } = useAuth();
+  const { signOut, profile, isAdmin, user } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const [isFreelancer, setIsFreelancer] = useState(false);
+
+  useEffect(() => {
+    if (!user) { setIsFreelancer(false); return; }
+    supabase.from("freelancers").select("id").eq("user_id", user.id).eq("status", "active").maybeSingle()
+      .then(({ data }) => setIsFreelancer(!!data));
+  }, [user]);
 
   const ADMIN_PATH = "/mx-control-9f3a2b";
   const items = admin
-    ? [
-        { to: ADMIN_PATH, icon: LayoutDashboard, label: "Visão geral" },
-      ]
-    : [
-        { to: "/dashboard", icon: LayoutDashboard, label: "Painel" },
-      ];
+    ? [{ to: ADMIN_PATH, icon: LayoutDashboard, label: "Visão geral" }]
+    : [{ to: "/dashboard", icon: LayoutDashboard, label: "Painel" }];
 
   const handleSignOut = async () => { await signOut(); navigate("/"); };
 
   return (
     <div className="min-h-screen bg-secondary/40 flex flex-col md:flex-row">
-      {/* Sidebar desktop */}
       <aside className="hidden md:flex w-64 flex-col bg-background border-r border-border p-6 gap-6 sticky top-0 h-screen">
         <Link to="/" className="flex items-center gap-2">
           <img src={logo} alt="MuacoX" className="h-16 w-auto" />
@@ -39,6 +42,12 @@ export const DashboardLayout = ({ children, admin }: Props) => {
               <it.icon className="h-4 w-4" />{it.label}
             </Link>
           ))}
+          {isFreelancer && pathname !== "/freelancer" && (
+            <Link to="/freelancer"
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold hover:bg-secondary text-primary">
+              <Headphones className="h-4 w-4" />Suporte Freelancer
+            </Link>
+          )}
           {isAdmin && !admin && (
             <Link to={ADMIN_PATH} className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold hover:bg-secondary text-primary">
               <Shield className="h-4 w-4" />Área Admin
@@ -68,10 +77,12 @@ export const DashboardLayout = ({ children, admin }: Props) => {
         </div>
       </aside>
 
-      {/* Mobile top bar */}
-      <header className="md:hidden sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border px-4 h-14 flex items-center justify-between">
+      <header className="md:hidden sticky top-0 z-40 bg-background border-b border-border px-4 h-14 flex items-center justify-between">
         <Link to="/"><img src={logo} alt="MuacoX" className="h-12 w-auto" /></Link>
         <div className="flex items-center gap-2">
+          {isFreelancer && pathname !== "/freelancer" && (
+            <Link to="/freelancer"><Button size="sm" variant="outline" className="rounded-full"><Headphones className="h-4 w-4" /></Button></Link>
+          )}
           {isAdmin && !admin && (
             <Link to={ADMIN_PATH}><Button size="sm" variant="outline" className="rounded-full"><Shield className="h-4 w-4" /></Button></Link>
           )}
@@ -83,3 +94,4 @@ export const DashboardLayout = ({ children, admin }: Props) => {
     </div>
   );
 };
+

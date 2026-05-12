@@ -12,6 +12,7 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { ProjectsManager } from "@/components/freelancer/ProjectsManager";
 import { SalesManager } from "@/components/freelancer/SalesManager";
 import { ContractsManager } from "@/components/freelancer/ContractsManager";
+import { SubscriptionGate } from "@/components/freelancer/SubscriptionGate";
 import { formatKz } from "@/lib/site";
 import { toast } from "sonner";
 
@@ -24,6 +25,7 @@ const FreelancerDashboard = () => {
   const navigate = useNavigate();
   const [isFreelancer, setIsFreelancer] = useState<boolean | null>(null);
   const [freelancerId, setFreelancerId] = useState<string | null>(null);
+  const [subActive, setSubActive] = useState(false);
   const [convs, setConvs] = useState<Conv[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [proofs, setProofs] = useState<Proof[]>([]);
@@ -35,12 +37,17 @@ const FreelancerDashboard = () => {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
 
-  useEffect(() => {
+  const loadFreelancer = () => {
     if (!user) return;
     supabase.from("freelancers")
-      .select("id,status").eq("user_id", user.id).maybeSingle()
-      .then(({ data }) => { setIsFreelancer(data?.status === "active"); setFreelancerId(data?.id || null); });
-  }, [user]);
+      .select("id,status,subscription_active").eq("user_id", user.id).maybeSingle()
+      .then(({ data }) => {
+        setIsFreelancer(data?.status === "active");
+        setFreelancerId(data?.id || null);
+        setSubActive(!!data?.subscription_active);
+      });
+  };
+  useEffect(() => { loadFreelancer(); }, [user]);
 
   useEffect(() => {
     if (!isFreelancer || !user) return;
@@ -201,10 +208,18 @@ const FreelancerDashboard = () => {
             </div>
           </TabsContent>
           <TabsContent value="projects">
-            {freelancerId && user && <ProjectsManager freelancerId={freelancerId} userId={user.id} />}
+            {freelancerId && user && (
+              <SubscriptionGate freelancerId={freelancerId} active={subActive} onActivated={loadFreelancer}>
+                <ProjectsManager freelancerId={freelancerId} userId={user.id} />
+              </SubscriptionGate>
+            )}
           </TabsContent>
           <TabsContent value="sales">
-            {freelancerId && <SalesManager freelancerId={freelancerId} />}
+            {freelancerId && (
+              <SubscriptionGate freelancerId={freelancerId} active={subActive} onActivated={loadFreelancer}>
+                <SalesManager freelancerId={freelancerId} />
+              </SubscriptionGate>
+            )}
           </TabsContent>
           <TabsContent value="contracts">
             {freelancerId && <ContractsManager freelancerId={freelancerId} />}

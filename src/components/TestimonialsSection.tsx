@@ -145,7 +145,7 @@ export const TestimonialsSection = () => {
 const TestimonialCard = ({ t }: { t: Testimonial }) => (
   <motion.article
     whileHover={{ y: -4 }}
-    className="shrink-0 w-[300px] md:w-[360px] rounded-3xl p-6 backdrop-blur-xl bg-foreground/[0.04] border border-foreground/10 shadow-soft hover:shadow-medium transition-all"
+    className="shrink-0 w-[300px] md:w-[360px] rounded-3xl p-6  bg-foreground/[0.04] border border-foreground/10 shadow-soft hover:shadow-medium transition-all"
   >
     <Quote className="h-7 w-7 text-foreground/20 mb-3" />
     <div className="flex gap-0.5 mb-4">
