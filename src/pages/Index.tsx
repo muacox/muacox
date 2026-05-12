@@ -3,9 +3,15 @@ import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import {
   ArrowRight, Globe, Server, Image as ImageIcon, Mail, Phone, Check,
   LayoutDashboard, LogIn, Menu, X, Zap, Shield, Headphones, Rocket,
-  Star, MapPin
+  Star, MapPin, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
