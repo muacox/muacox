@@ -279,6 +279,10 @@ export type Database = {
           last_seen: string | null
           specialty: string | null
           status: string
+          subscription_active: boolean
+          subscription_amount: number
+          subscription_paid_at: string | null
+          subscription_reference: string | null
           updated_at: string
           user_id: string | null
         }
@@ -298,6 +302,10 @@ export type Database = {
           last_seen?: string | null
           specialty?: string | null
           status?: string
+          subscription_active?: boolean
+          subscription_amount?: number
+          subscription_paid_at?: string | null
+          subscription_reference?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -317,6 +325,10 @@ export type Database = {
           last_seen?: string | null
           specialty?: string | null
           status?: string
+          subscription_active?: boolean
+          subscription_amount?: number
+          subscription_paid_at?: string | null
+          subscription_reference?: string | null
           updated_at?: string
           user_id?: string | null
         }
